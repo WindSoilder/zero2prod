@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::net::TcpListener;
-use surf::http::{Body, Method, Url};
+use surf::http::{Method, Url};
 
 #[derive(Serialize, Clone)]
 struct Subscription {
