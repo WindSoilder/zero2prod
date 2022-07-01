@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use sqlx::{Connection, PgConnection};
 use std::net::TcpListener;
 use surf::http::{Method, Url};
+use zero2prod::configuration::get_configuration;
 
 #[derive(Serialize, Clone)]
 struct Subscription {
@@ -23,6 +25,11 @@ async fn health_check_works() {
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange
     let app_address = spawn_app();
+    let configuration = get_configuration().expect("Failed to read configuration");
+    let connection_string = configuration.database.connection_string();
+    let mut connection = PgConnection::connect(&connection_string)
+        .await
+        .expect("Failed to connect to Postgres.");
 
     let url =
         Url::parse(&format!("{app_address}/subscriptions")).expect("failed to parse url address");
@@ -42,6 +49,12 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
         .expect("Failed to execute request.");
 
     assert_eq!(response.status(), 200);
+    let saved = sqlx::query!("SELECT email, name FROM subscriptions",)
+        .fetch_one(&mut connection)
+        .await
+        .expect("Failed to fetch saved subscription.");
+    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
+    assert_eq!(saved.name, "le guin");
 }
 
 #[async_std::test]

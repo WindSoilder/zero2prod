@@ -19,7 +19,7 @@ let DB_PASSWORD = ($env | get -i "POSTGRES_PASSWORD" | default "password")
 let DB_NAME = ($env | get -i "POSTGRES_DB" | default "newsletter")
 let DB_PORT = ($env | get -i "POSTGRES_PORT" | default 5432)
 
-if ($env | get -i "SKIP_DOCKER" | default false) {
+if (not ($env | get -i "SKIP_DOCKER" | default false)) {
     # Launch postgres using Docker
     docker run -e $'POSTGRES_USER=($DB_USER)' -e $'POSTGRES_PASSWORD=($DB_PASSWORD)' -e $'POSTGRES_DB=($DB_NAME)' -p $'($DB_PORT):5432' -d postgres postgres -N 1000
                                                                                                                                                             # ^ Increased maximum number of connections for testing purposes
