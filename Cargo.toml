@@ -11,10 +11,12 @@ tide = "0.17.0-beta.1"
 async-std = { version = "1.8.0", features = ["attributes"] }
 serde = { version = "1.0", features = ["derive"] }
 config = "0.11"
+uuid = { version = "1.1.2", features = ["v4"] }
+chrono = "0.4.19"
 
 # Using table-like toml syntax to avoid a super-long line!
 [dependencies.sqlx]
-version = "0.5"
+version = "0.6"
 default-features = false
 features = [
     "runtime-async-std-native-tls",
@@ -22,7 +24,7 @@ features = [
     "macros",
     "uuid",
     "chrono",
-    "migrate"
+    "migrate",
 ]
 [dev-dependencies]
 surf = "2.3.2"
