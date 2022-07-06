@@ -2,7 +2,12 @@ version: 2
 jobs:
   build-and-test:
     docker:
-      - image: cimg/rust
+      - image: cimg/rust:1.61-node
+      - image: cimg/postgres:14.2
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
     environment:
       # Fail the build if there are warnings
       RUSTFLAGS: '-D warnings'
@@ -11,11 +16,15 @@ jobs:
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
-      # If you have committed your Cargo.lock file to version control
-      # delete this step.
       - run:
-          name: Calculate dependencies
-          command: cargo generate-lockfile
+          name: Install sqlx-cli
+          command: cargo install sqlx-cli --no-default-features --features native-tls,postgres
+      - run:
+          name: Install nushell
+          command: curl -L https://github.com/nushell/nushell/releases/download/0.65.0/nu-0.65.0-x86_64-unknown-linux-gnu.tar.gz | tar -C ~/.cargo/bin -xvzf - nu
+      - run:
+          name: Migrate database
+          command: SKIP_DOCKER=true nu ./scripts/init_db.nu
       - restore_cache:
           keys:
             - v1-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
@@ -24,44 +33,16 @@ jobs:
           command: cargo build
       - save_cache:
           paths:
-            - /usr/local/cargo/registry
-            - target/debug/.fingerprint
-            - target/debug/build
-            - target/debug/deps
+            - ~/.cargo/registry
+            - ~/.cargo/git
+            - target
           key: v1-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
           name: Run all tests
           command: cargo test
-
-  security:
-    docker:
-      - image: cimg/rust
-    steps:
-      - checkout
-      - run:
-          name: Version information
-          command: rustc --version; cargo --version; rustup --version
-      - run:
-          name: Cache permission
-          command: |
-            sudo chown -R $(whoami):$(id -ng) /usr/local/cargo
-      - restore_cache:
-          keys:
-            - v1-cargo-audit-{{ arch }}
-      - run:
-          name: Install dependency auditing tool
-          command: cargo install cargo-audit
-      - save_cache:
-          paths:
-            - /usr/local/cargo
-          key: v1-cargo-audit-{{ arch }}
-      - run:
-          name: Check for known security issues in dependencies
-          command: cargo audit
-
   format:
     docker:
-      - image: cimg/rust
+      - image: cimg/rust:1.61-node
     steps:
       - checkout
       - run:
@@ -76,7 +57,12 @@ jobs:
 
   lint:
     docker:
-      - image: cimg/rust
+      - image: cimg/rust:1.61-node
+      - image: cimg/postgres:14.2
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
     steps:
       - checkout
       - run:
@@ -86,16 +72,17 @@ jobs:
           name: Install Clippy
           command: rustup component add clippy
       - run:
+          name: Install sqlx-cli
+          command: cargo install sqlx-cli --no-default-features --features native-tls,postgres
+      - run:
+          name: Install nushell
+          command: curl -L https://github.com/nushell/nushell/releases/download/0.65.0/nu-0.65.0-x86_64-unknown-linux-gnu.tar.gz | tar -C ~/.cargo/bin -xvzf - nu
+      - run:
+          name: Migrate database
+          command: SKIP_DOCKER=true nu ./scripts/init_db.nu
+      - run:
           name: Linting
           command: cargo clippy -- -D warnings
-
-  coverage:
-    machine: true
-    steps:
-      - checkout
-      - run:
-          name: Coverage with docker
-          command: docker run --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin cargo tarpaulin --ignore-tests
 
 workflows:
   version: 2
@@ -105,19 +92,11 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - security:
-          filters:
-            tags:
-              only: /.*/
       - format:
           filters:
             tags:
               only: /.*/
       - lint:
-          filters:
-            tags:
-              only: /.*/
-      - coverage:
           filters:
             tags:
               only: /.*/
