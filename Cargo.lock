@@ -2726,5 +2726,6 @@ dependencies = [
  "sqlx",
  "surf",
  "tide",
+ "tracing",
  "uuid",
 ]
