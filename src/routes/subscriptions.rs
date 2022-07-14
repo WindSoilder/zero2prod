@@ -4,6 +4,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tide::Result;
 use tide::{Response, StatusCode};
+use tracing::Instrument;
 use uuid::Uuid;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -19,12 +20,17 @@ pub async fn subscribe(mut req: Request) -> Result {
     })?;
     // generate a random unique identifier.
     let request_id = Uuid::new_v4();
-    tracing::info!(
-        "request_id {request_id} - Adding '{}' '{}' as a new subscriber.",
-        subscribe_body.email,
-        subscribe_body.name
+    let request_span = tracing::info_span!(
+        "Adding a new subscriber.",
+        %request_id,
+        subscriber_email = %subscribe_body.email,
+        subscriber_name = %subscribe_body.name,
     );
-    tracing::info!("request_id {request_id} - Saving new subscriber details in the database");
+    let _request_span_guard = request_span.enter();
+    // We do not call `.enter` on query_span!
+    // `.instrument` takes care of it at the right moments
+    // in the query future lifetime
+    let query_span = tracing::info_span!("Saving new subscriber details in the databse");
     match sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
@@ -36,6 +42,7 @@ pub async fn subscribe(mut req: Request) -> Result {
         Utc::now()
     )
     .execute(&req.state().connection)
+    .instrument(query_span)
     .await
     {
         Ok(_) => {
