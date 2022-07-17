@@ -1,15 +1,22 @@
 use sqlx::PgPool;
-use std::env;
-use std::str::FromStr;
-use tide::log::LevelFilter;
+use tracing::subscriber::set_global_default;
+use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_log::LogTracer;
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
 use zero2prod::configuration::get_configuration;
 use zero2prod::get_server;
 
 #[async_std::main]
 async fn main() -> tide::Result<()> {
-    let level = env::var("RUST_LOG").unwrap_or("info".to_string());
-    let log_level = LevelFilter::from_str(&level).unwrap_or(LevelFilter::Info);
-    tide::log::with_level(log_level);
+    LogTracer::init().expect("failed to initialize log tracer");
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let formatting_layer = BunyanFormattingLayer::new("zero2prod".into(), std::io::stdout);
+    let subscriber = Registry::default()
+        .with(env_filter)
+        .with(JsonStorageLayer)
+        .with(formatting_layer);
+    set_global_default(subscriber).expect("Failed to set subsceiber");
+
     let configuration = get_configuration().expect("Failed to read configuration.");
     let server = get_server(
         PgPool::connect(&configuration.database.connection_string())

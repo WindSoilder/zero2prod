@@ -2856,6 +2856,7 @@ dependencies = [
  "tide",
  "tracing",
  "tracing-bunyan-formatter",
+ "tracing-log",
  "tracing-subscriber",
  "uuid",
 ]
