@@ -2850,6 +2850,7 @@ dependencies = [
  "async-std",
  "chrono",
  "config",
+ "once_cell",
  "serde 1.0.137",
  "sqlx",
  "surf",

@@ -32,3 +32,4 @@ features = [
 ]
 [dev-dependencies]
 surf = "2.3.2"
+once_cell = "1"
