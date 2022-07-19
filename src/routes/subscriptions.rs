@@ -2,9 +2,9 @@ use crate::Request;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use tide::Result;
 use tide::{Response, StatusCode};
-use tracing::Instrument;
 use uuid::Uuid;
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -18,40 +18,49 @@ pub async fn subscribe(mut req: Request) -> Result {
         e.set_status(400);
         e
     })?;
-    // generate a random unique identifier.
-    let request_id = Uuid::new_v4();
-    let request_span = tracing::info_span!(
-        "Adding a new subscriber.",
-        %request_id,
-        subscriber_email = %subscribe_body.email,
-        subscriber_name = %subscribe_body.name,
-    );
-    let _request_span_guard = request_span.enter();
-    // We do not call `.enter` on query_span!
-    // `.instrument` takes care of it at the right moments
-    // in the query future lifetime
-    let query_span = tracing::info_span!("Saving new subscriber details in the databse");
-    match sqlx::query!(
+    add_subscriber(
+        subscribe_body.name,
+        subscribe_body.email,
+        &req.state().connection,
+    )
+    .await
+}
+
+// WARN: can't use `name` as argument name for `add_subscriber`, or tracing will not show that argument.
+// Because it already have a `name` field for Layer.
+#[tracing::instrument(
+    name = "Adding a new subscriber",
+    skip(pool),
+    fields(request_id = %Uuid::new_v4())
+)]
+async fn add_subscriber(username: String, email: String, pool: &PgPool) -> Result {
+    match insert_subscriber(username, email, pool).await {
+        Ok(_) => Ok("".into()),
+        Err(_) => Ok(Response::builder(StatusCode::InternalServerError).build()),
+    }
+}
+
+#[tracing::instrument(name = "Savning new subscriber details in the database")]
+async fn insert_subscriber(
+    username: String,
+    email: String,
+    pool: &PgPool,
+) -> std::result::Result<(), sqlx::Error> {
+    sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
         VALUES ($1, $2, $3, $4)
         "#,
         Uuid::new_v4(),
-        subscribe_body.email,
-        subscribe_body.name,
+        email,
+        username,
         Utc::now()
     )
-    .execute(&req.state().connection)
-    .instrument(query_span)
+    .execute(pool)
     .await
-    {
-        Ok(_) => {
-            tracing::info!("request_id {request_id} - New subscriber details have been saved");
-            Ok("".into())
-        }
-        Err(e) => {
-            tracing::error!("request_id {request_id} - Failed to execute query: {e:?}");
-            Ok(Response::builder(StatusCode::InternalServerError).build())
-        }
-    }
+    .map_err(|e| {
+        tracing::error!("Failed to execute query: {e:?}");
+        e
+    })?;
+    Ok(())
 }
