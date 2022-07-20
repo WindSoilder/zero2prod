@@ -2,6 +2,7 @@ use sqlx::PgPool;
 use zero2prod::configuration::get_configuration;
 use zero2prod::get_server;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
+use secrecy::ExposeSecret;
 
 #[async_std::main]
 async fn main() -> tide::Result<()> {
@@ -9,7 +10,7 @@ async fn main() -> tide::Result<()> {
     init_subscriber(subscriber);
     let configuration = get_configuration().expect("Failed to read configuration.");
     let server = get_server(
-        PgPool::connect(&configuration.database.connection_string())
+        PgPool::connect(&configuration.database.connection_string().expose_secret())
             .await
             .unwrap(),
     );
