@@ -238,20 +238,20 @@ dependencies = [
 
 [[package]]
 name = "async-session"
-version = "3.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07da4ce523b4e2ebaaf330746761df23a465b951a83d84bbce4233dabedae630"
+checksum = "345022a2eed092cd105cc1b26fd61c341e100bd5fcbbd792df4baf31c2cc631f"
 dependencies = [
  "anyhow",
- "async-lock",
+ "async-std",
  "async-trait",
- "base64",
+ "base64 0.12.3",
  "bincode",
  "blake3",
  "chrono",
- "hmac 0.11.0",
- "log",
- "rand 0.8.5",
+ "hmac 0.8.1",
+ "kv-log-macro",
+ "rand 0.7.3",
  "serde 1.0.137",
  "serde_json",
  "sha2 0.9.9",
@@ -343,6 +343,12 @@ name = "base-x"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc19a4937b4fbd3fe3379793130e42060d10627a360f2127802b10b87e7baf74"
+
+[[package]]
+name = "base64"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
 
 [[package]]
 name = "base64"
@@ -527,7 +533,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03a5d7b21829bc7b4bf4754a978a241ae54ea55a40f92bb20216e54096f4b951"
 dependencies = [
  "aes-gcm",
- "base64",
+ "base64 0.13.0",
  "hkdf 0.10.0",
  "hmac 0.10.1",
  "percent-encoding",
@@ -628,16 +634,6 @@ name = "crypto-mac"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bff07008ec701e8028e2ceb8f83f0e4274ee62bd2dbdc4fefff2e9a91824081a"
-dependencies = [
- "generic-array",
- "subtle",
-]
-
-[[package]]
-name = "crypto-mac"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1d1a86f49236c215f271d40892d5fc950490551400b02ef360692c29815c714"
 dependencies = [
  "generic-array",
  "subtle",
@@ -1057,21 +1053,21 @@ dependencies = [
 
 [[package]]
 name = "hmac"
-version = "0.10.1"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1441c6b1e930e2817404b5046f1f989899143a12bf92de603b69f4e0aee1e15"
+checksum = "126888268dcc288495a26bf004b38c5fdbb31682f992c84ceb046a1f0fe38840"
 dependencies = [
- "crypto-mac 0.10.1",
+ "crypto-mac 0.8.0",
  "digest 0.9.0",
 ]
 
 [[package]]
 name = "hmac"
-version = "0.11.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a2a2320eb7ec0ebe8da8f744d7812d9fc4cb4d09344ac01898dbcb6a20ae69b"
+checksum = "c1441c6b1e930e2817404b5046f1f989899143a12bf92de603b69f4e0aee1e15"
 dependencies = [
- "crypto-mac 0.11.1",
+ "crypto-mac 0.10.1",
  "digest 0.9.0",
 ]
 
@@ -1118,7 +1114,7 @@ dependencies = [
  "anyhow",
  "async-channel",
  "async-std",
- "base64",
+ "base64 0.13.0",
  "cookie",
  "futures-lite",
  "infer",
@@ -1766,14 +1762,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "routefinder"
-version = "0.4.0"
+name = "route-recognizer"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a44ef95cc607e41a7021da5cfb0f357ee0805113af2e9e6c617857c260940db4"
-dependencies = [
- "smartcow",
- "smartstring",
-]
+checksum = "56770675ebc04927ded3e60633437841581c285dc6236109ea25fbf3beb7b59e"
 
 [[package]]
 name = "rust-ini"
@@ -2052,24 +2044,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
 
 [[package]]
-name = "smartcow"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05e3ed3ccf93c7425507e5e2261a3fc90d14267d491f360b9b679ae0a4ce693e"
-dependencies = [
- "smartstring",
-]
-
-[[package]]
-name = "smartstring"
-version = "0.2.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e714dff2b33f2321fdcd475b71cec79781a692d846f37f415fb395a1d2bcd48e"
-dependencies = [
- "static_assertions",
-]
-
-[[package]]
 name = "socket2"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2117,7 +2091,7 @@ checksum = "6b69bf218860335ddda60d6ce85ee39f6cf6e5630e300e19757d1de15886a093"
 dependencies = [
  "ahash",
  "atoi",
- "base64",
+ "base64 0.13.0",
  "bitflags",
  "byteorder",
  "bytes 1.1.0",
@@ -2357,9 +2331,9 @@ dependencies = [
 
 [[package]]
 name = "tide"
-version = "0.17.0-beta.1"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5a885fbeb66af9d607a731ce167e3fdfe65e49a68f37f4bbd8618b5efc6ad51"
+checksum = "c459573f0dd2cc734b539047f57489ea875af8ee950860ded20cf93a79a1dee0"
 dependencies = [
  "async-h1",
  "async-session",
@@ -2373,9 +2347,21 @@ dependencies = [
  "kv-log-macro",
  "log",
  "pin-project-lite 0.2.9",
- "routefinder",
+ "route-recognizer",
  "serde 1.0.137",
  "serde_json",
+]
+
+[[package]]
+name = "tide-tracing"
+version = "0.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9737dbee8b322744e5c0fb4d7baf1e1fae332056cbc1f8a356162a6211b853f4"
+dependencies = [
+ "async-trait",
+ "tide",
+ "tracing",
+ "tracing-futures",
 ]
 
 [[package]]
@@ -2866,6 +2852,7 @@ dependencies = [
  "sqlx",
  "surf",
  "tide",
+ "tide-tracing",
  "tracing",
  "tracing-bunyan-formatter",
  "tracing-log",
