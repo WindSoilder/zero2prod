@@ -10,13 +10,14 @@ async fn main() -> tide::Result<()> {
     init_subscriber(subscriber);
     let configuration = get_configuration().expect("Failed to read configuration.");
     let server = get_server(
-        PgPool::connect(configuration.database.connection_string().expose_secret())
-            .await
-            .unwrap(),
+        PgPool::connect_lazy(configuration.database.connection_string().expose_secret()).unwrap(),
     );
 
     server
-        .listen(format!("127.0.0.1:{}", configuration.application_port))
+        .listen(format!(
+            "{}:{}",
+            configuration.application.host, configuration.application.port
+        ))
         .await?;
     Ok(())
 }

@@ -1,0 +1,22 @@
+# We use the latest Rust stable release as base image
+FROM rust:1.62.1
+# Let's switch our working directory to `app` (equivalent to `cd app`)
+# The `app` folder will be created for us by Docker in case it does not exist already.
+WORKDIR /app
+
+# Install the required system dependencies for our linking configuration
+# RUN apt update -y && apt install lld clang -y
+# Copy all files from our working environment to our Docker image
+COPY ./src ./src
+COPY ./Cargo.toml ./Cargo.toml
+COPY ./.cargo ./.cargo
+COPY ./configuration ./configuration
+COPY ./sqlx-data.json ./sqlx-data.json
+
+ENV SQLX_OFFLINE true
+# Let's build our binary!
+# We'll use the release profile to make it fast
+RUN cargo build --release
+ENV APP_ENVIRONMENT production
+# When `docker run` is executed, launch the binary!
+ENTRYPOINT ["./target/release/zero2prod"]
