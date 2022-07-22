@@ -7,11 +7,7 @@ WORKDIR /app
 # Install the required system dependencies for our linking configuration
 # RUN apt update -y && apt install lld clang -y
 # Copy all files from our working environment to our Docker image
-COPY ./src ./src
-COPY ./Cargo.toml ./Cargo.toml
-COPY ./.cargo ./.cargo
-COPY ./configuration ./configuration
-COPY ./sqlx-data.json ./sqlx-data.json
+COPY . .
 
 ENV SQLX_OFFLINE true
 # Let's build our binary!
