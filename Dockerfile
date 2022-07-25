@@ -7,8 +7,8 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef as builder
-# For Chinese fucking network...
-COPY .cargo .cargo 
+# For Chinese network...
+# COPY .cargo .cargo
 COPY --from=planner /app/recipe.json recipe.json
 # Build our project dependencies, not our application.
 RUN cargo chef cook --release --recipe-path recipe.json
