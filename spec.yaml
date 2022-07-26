@@ -49,7 +49,6 @@ services:
       - key: APP_DATABASE__PORT
         scope: RUN_TIME
         value: ${newsletter.PORT}
-        scope: RUN_TIME
       - key: APP_DATABASE__DATABASE_NAME
         scope: RUN_TIME
         value: ${newsletter.DATABASE}
