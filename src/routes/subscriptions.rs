@@ -19,18 +19,21 @@ pub async fn subscribe(mut req: Request) -> Result {
         e.set_status(400);
         e
     })?;
-    let name = match SubscriberName::parse(subscribe_body.name) {
-        Ok(name) => name,
-        // Return early if the name is invalid, with a 400
+    let new_subscriber = match subscribe_body.try_into() {
+        Ok(subscriber) => subscriber,
         Err(_) => return Ok(Response::builder(StatusCode::BadRequest).build()),
     };
-    let email = match SubscriberEmail::parse(subscribe_body.email) {
-        Ok(email) => email,
-        // Return early if the name is invalid, with a 400
-        Err(_) => return Ok(Response::builder(StatusCode::BadRequest).build()),
-    };
-    let new_subscriber = NewSubscriber { email, name };
     add_subscriber(&new_subscriber, &req.state().connection).await
+}
+
+impl TryFrom<SubscribeBody> for NewSubscriber {
+    type Error = String;
+
+    fn try_from(value: SubscribeBody) -> std::result::Result<Self, Self::Error> {
+        let name = SubscriberName::parse(value.name)?;
+        let email = SubscriberEmail::parse(value.email)?;
+        Ok(NewSubscriber { email, name })
+    }
 }
 
 // WARN: can't use `name` as argument name for `add_subscriber`, or tracing will not show that argument.
