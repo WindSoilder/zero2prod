@@ -124,6 +124,61 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
     }
 }
 
+#[async_std::test]
+async fn subscribe_returns_a_400_when_fields_are_present_but_empty() {
+    #[derive(Clone, Serialize, Deserialize)]
+    struct Subscription {
+        name: Option<String>,
+        email: Option<String>,
+    }
+    // Arrange
+    let app = spawn_app().await;
+    let test_cases = vec![
+        (
+            Subscription {
+                name: Some("".to_string()),
+                email: Some("ursula_le_guin@gmail.com".to_string()),
+            },
+            "empty name",
+        ),
+        (
+            Subscription {
+                name: Some("Ursula".to_string()),
+                email: Some("".to_string()),
+            },
+            "empty email",
+        ),
+        (
+            Subscription {
+                name: Some("Ursula".to_string()),
+                email: Some("not-an-email".to_string()),
+            },
+            "invalid email",
+        ),
+    ];
+    let url =
+        Url::parse(&format!("{}/subscriptions", app.address)).expect("failed to parse url address");
+    let client = surf::client();
+
+    for (body, description) in test_cases {
+        // Act
+        let mut request = surf::Request::builder(Method::Post, url.clone()).build();
+        request.body_form(&body).unwrap();
+        let response = client
+            .send(request)
+            .await
+            .expect("Failed to execute request.");
+
+        // Assert
+        assert_eq!(
+            response.status(),
+            400,
+            "The API did not return a 200 OK when the payload was {}.",
+            description
+        )
+    }
+}
+
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,

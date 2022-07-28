@@ -1,5 +1,6 @@
 use crate::Request;
 
+use crate::domain::{NewSubscriber, SubscriberName};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -18,12 +19,16 @@ pub async fn subscribe(mut req: Request) -> Result {
         e.set_status(400);
         e
     })?;
-    add_subscriber(
-        subscribe_body.name,
-        subscribe_body.email,
-        &req.state().connection,
-    )
-    .await
+    let name = match SubscriberName::parse(subscribe_body.name) {
+        Ok(name) => name,
+        // Return early if the name is invalid, with a 400
+        Err(_) => return Ok(Response::builder(StatusCode::BadRequest).build()),
+    };
+    let new_subscriber = NewSubscriber {
+        email: subscribe_body.email,
+        name,
+    };
+    add_subscriber(&new_subscriber, &req.state().connection).await
 }
 
 // WARN: can't use `name` as argument name for `add_subscriber`, or tracing will not show that argument.
@@ -33,8 +38,8 @@ pub async fn subscribe(mut req: Request) -> Result {
     skip(pool),
     fields(request_id = %Uuid::new_v4())
 )]
-async fn add_subscriber(username: String, email: String, pool: &PgPool) -> Result {
-    match insert_subscriber(username, email, pool).await {
+async fn add_subscriber(new_subscriber: &NewSubscriber, pool: &PgPool) -> Result {
+    match insert_subscriber(new_subscriber, pool).await {
         Ok(_) => Ok("".into()),
         Err(_) => Ok(Response::builder(StatusCode::InternalServerError).build()),
     }
@@ -42,8 +47,7 @@ async fn add_subscriber(username: String, email: String, pool: &PgPool) -> Resul
 
 #[tracing::instrument(name = "Savning new subscriber details in the database")]
 async fn insert_subscriber(
-    username: String,
-    email: String,
+    new_subscriber: &NewSubscriber,
     pool: &PgPool,
 ) -> std::result::Result<(), sqlx::Error> {
     sqlx::query!(
@@ -52,8 +56,8 @@ async fn insert_subscriber(
         VALUES ($1, $2, $3, $4)
         "#,
         Uuid::new_v4(),
-        email,
-        username,
+        new_subscriber.email,
+        new_subscriber.name.as_ref(),
         Utc::now()
     )
     .execute(pool)
