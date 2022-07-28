@@ -1,6 +1,6 @@
 use crate::Request;
 
-use crate::domain::{NewSubscriber, SubscriberName};
+use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -24,10 +24,12 @@ pub async fn subscribe(mut req: Request) -> Result {
         // Return early if the name is invalid, with a 400
         Err(_) => return Ok(Response::builder(StatusCode::BadRequest).build()),
     };
-    let new_subscriber = NewSubscriber {
-        email: subscribe_body.email,
-        name,
+    let email = match SubscriberEmail::parse(subscribe_body.email) {
+        Ok(email) => email,
+        // Return early if the name is invalid, with a 400
+        Err(_) => return Ok(Response::builder(StatusCode::BadRequest).build()),
     };
+    let new_subscriber = NewSubscriber { email, name };
     add_subscriber(&new_subscriber, &req.state().connection).await
 }
 
@@ -56,7 +58,7 @@ async fn insert_subscriber(
         VALUES ($1, $2, $3, $4)
         "#,
         Uuid::new_v4(),
-        new_subscriber.email,
+        new_subscriber.email.as_ref(),
         new_subscriber.name.as_ref(),
         Utc::now()
     )
