@@ -5,6 +5,7 @@ use std::net::TcpListener;
 use surf::http::{Method, Url};
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
+use zero2prod::email_client::EmailClient;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 // Ensure that the `tracing` stack is only initialised once using `once_cell`
@@ -197,8 +198,14 @@ async fn spawn_app() -> TestApp {
     let connection_pool = configure_database(&configuration.database).await;
 
     let pool_for_server = connection_pool.clone();
+    // Build a new email client
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email address.");
+    let email_client = EmailClient::new(configuration.email_client.base_url, sender_email);
     let _ = async_std::task::spawn(async {
-        zero2prod::get_server(pool_for_server)
+        zero2prod::get_server(pool_for_server, email_client)
             .listen(listener)
             .await
     });
