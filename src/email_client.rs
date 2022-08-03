@@ -1,6 +1,7 @@
 use crate::domain::SubscriberEmail;
 use secrecy::{ExposeSecret, Secret};
 use surf::Client;
+use surf::Config;
 
 #[derive(Clone)]
 pub struct EmailClient {
@@ -16,8 +17,15 @@ impl EmailClient {
         sender: SubscriberEmail,
         authorization_token: Secret<String>,
     ) -> Self {
+        // we only set timeout, so creating client will always be ok.
+
+        let client = Config::new()
+            .set_timeout(Some(std::time::Duration::from_secs(10)))
+            .try_into()
+            .expect("only config with connection timeout, the try_into should be success");
+
         Self {
-            http_client: surf::client(),
+            http_client: client,
             base_url: base_url,
             sender: sender,
             authorization_token,
@@ -47,7 +55,14 @@ impl EmailClient {
                 self.authorization_token.expose_secret(),
             )
             .body_json(&request_body)?;
-        req_builder.await?;
+        let response = req_builder.await?;
+        let resp_status = response.status();
+        if resp_status.is_client_error() || resp_status.is_server_error() {
+            return Err(surf::Error::from_str(
+                resp_status,
+                "Get error status code from server",
+            ));
+        }
         Ok(())
     }
 }
@@ -66,11 +81,12 @@ struct SendEmailRequest<'a> {
 mod tests {
     use crate::domain::SubscriberEmail;
     use crate::email_client::EmailClient;
+    use claim::{assert_err, assert_ok};
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::{Fake, Faker};
     use secrecy::Secret;
-    use wiremock::matchers::{header, header_exists, method, path};
+    use wiremock::matchers::{any, header, header_exists, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     struct SendEmailBodyMatcher;
@@ -118,5 +134,84 @@ mod tests {
             .send_email(subscriber_email, &subject, &content, &content)
             .await;
         // Assert
+    }
+
+    #[async_std::test]
+    async fn send_email_succeeds_if_the_server_returns_200() {
+        // Arrange
+        let mock_server = MockServer::start().await;
+        let sender = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
+        let email_client = EmailClient::new(mock_server.uri(), sender, Secret::new(Faker.fake()));
+
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(200))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let subscriber_email = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
+        let subject: String = Sentence(1..2).fake();
+        let content: String = Paragraph(1..10).fake();
+
+        // Act
+        let outcome = email_client
+            .send_email(subscriber_email, &subject, &content, &content)
+            .await;
+
+        // Assert
+        assert_ok!(outcome);
+    }
+
+    #[async_std::test]
+    async fn send_email_failes_if_the_server_returns_500() {
+        // Arrange
+        let mock_server = MockServer::start().await;
+        let sender = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
+        let email_client = EmailClient::new(mock_server.uri(), sender, Secret::new(Faker.fake()));
+
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(500))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let subscriber_email = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
+        let subject: String = Sentence(1..2).fake();
+        let content: String = Paragraph(1..10).fake();
+
+        // Act
+        let outcome = email_client
+            .send_email(subscriber_email, &subject, &content, &content)
+            .await;
+
+        // Assert
+        assert_err!(outcome);
+    }
+
+    #[async_std::test]
+    async fn send_email_times_out_if_the_server_takes_too_long() {
+        // Arrange
+        let mock_server = MockServer::start().await;
+        let sender = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
+        let email_client = EmailClient::new(mock_server.uri(), sender, Secret::new(Faker.fake()));
+
+        let response = ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(70));
+        Mock::given(any())
+            .respond_with(response)
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let subscriber_email = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
+        let subject: String = Sentence(1..2).fake();
+        let content: String = Paragraph(1..10).fake();
+
+        // Act
+        let outcome = email_client
+            .send_email(subscriber_email, &subject, &content, &content)
+            .await;
+
+        // Assert
+        assert_err!(outcome);
     }
 }
