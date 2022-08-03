@@ -203,10 +203,12 @@ async fn spawn_app() -> TestApp {
         .email_client
         .sender()
         .expect("Invalid sender email address.");
+    let timeout = configuration.email_client.timeout();
     let email_client = EmailClient::new(
         configuration.email_client.base_url,
         sender_email,
         configuration.email_client.authorization_token,
+        timeout,
     );
     let _ = async_std::task::spawn(async {
         zero2prod::get_server(pool_for_server, email_client)
