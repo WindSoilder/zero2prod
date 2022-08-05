@@ -1,34 +1,17 @@
-use crate::helpers::spawn_app;
+use crate::helpers::{spawn_app, Subscription};
 use serde::{Deserialize, Serialize};
 use surf::http::{Method, Url};
-
-#[derive(Serialize, Clone)]
-struct Subscription {
-    name: String,
-    email: String,
-}
 
 #[async_std::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange
     let test_app = spawn_app().await;
-
-    let url = Url::parse(&format!("{}/subscriptions", test_app.address))
-        .expect("failed to parse url address");
-
-    let mut request = surf::Request::builder(Method::Post, url).build();
-    request
-        .body_form(&Subscription {
-            name: "le guin".to_string(),
-            email: "ursula_le_guin@gmail.com".to_string(),
+    let response = test_app
+        .post_subscriptions(&Subscription {
+            name: Some("le guin".to_string()),
+            email: Some("ursula_le_guin@gmail.com".to_string()),
         })
-        .unwrap();
-
-    let client = surf::client();
-    let response = client
-        .send(request)
-        .await
-        .expect("Failed to execute request.");
+        .await;
 
     assert_eq!(response.status(), 200);
     let saved = sqlx::query!("SELECT email, name FROM subscriptions",)
@@ -41,11 +24,6 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
 #[async_std::test]
 async fn subscribe_returns_a_400_when_data_is_missing() {
-    #[derive(Clone, Serialize, Deserialize)]
-    struct Subscription {
-        name: Option<String>,
-        email: Option<String>,
-    }
     // Arrange
     let test_app = spawn_app().await;
     let test_cases = vec![
@@ -71,18 +49,9 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
             "missing both name and email",
         ),
     ];
-    let url = Url::parse(&format!("{}/subscriptions", test_app.address))
-        .expect("failed to parse url address");
-    let client = surf::client();
     for (invalid_body, error_message) in test_cases {
         // Act
-        let mut request = surf::Request::builder(Method::Post, url.clone()).build();
-        request.body_form(&invalid_body).unwrap();
-        let response = client
-            .send(request)
-            .await
-            .expect("Failed to execute request.");
-
+        let response = test_app.post_subscriptions(&invalid_body).await;
         // Assert
         assert_eq!(
             response.status(),

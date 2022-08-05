@@ -1,5 +1,7 @@
 use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
+use surf::Url;
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
@@ -7,6 +9,27 @@ use zero2prod::telemetry::{get_subscriber, init_subscriber};
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Subscription {
+    pub name: Option<String>,
+    pub email: Option<String>,
+}
+
+impl TestApp {
+    pub async fn post_subscriptions(&self, body: &Subscription) -> surf::Response {
+        let url = Url::parse(&format!("{}/subscriptions", self.address))
+            .expect("failed to parse url address");
+
+        let client = surf::client();
+        let mut request = surf::post(url).build();
+        request.body_form(&body).unwrap();
+        client
+            .send(request)
+            .await
+            .expect("Failed to execute request.")
+    }
 }
 
 // Ensure that the `tracing` stack is only initialised once using `once_cell`
