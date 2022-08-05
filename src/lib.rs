@@ -7,7 +7,7 @@ pub mod telemetry;
 
 use email_client::EmailClient;
 use sqlx::PgPool;
-pub use startup::get_server;
+pub use startup::Application;
 
 #[derive(Clone)]
 pub struct State {

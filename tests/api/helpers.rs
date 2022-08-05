@@ -1,9 +1,7 @@
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
-use zero2prod::email_client::EmailClient;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 pub struct TestApp {
@@ -30,32 +28,20 @@ pub async fn spawn_app() -> TestApp {
     // All other invocations will instead skip execution.
     Lazy::force(&TRACING);
 
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
-    let port = listener.local_addr().unwrap().port();
-    let mut configuration = get_configuration().expect("Failed to read configuration.");
-    configuration.database.database_name = Uuid::new_v4().to_string();
+    let configuration = {
+        let mut c = get_configuration().expect("Failed to read configuration.");
+        c.application.port = 0;
+        c.database.database_name = Uuid::new_v4().to_string();
+        c
+    };
     let connection_pool = configure_database(&configuration.database).await;
 
-    let pool_for_server = connection_pool.clone();
-    // Build a new email client
-    let sender_email = configuration
-        .email_client
-        .sender()
-        .expect("Invalid sender email address.");
-    let timeout = configuration.email_client.timeout();
-    let email_client = EmailClient::new(
-        configuration.email_client.base_url,
-        sender_email,
-        configuration.email_client.authorization_token,
-        timeout,
-    );
-    let _ = async_std::task::spawn(async {
-        zero2prod::get_server(pool_for_server, email_client)
-            .listen(listener)
-            .await
-    });
+    let application = zero2prod::Application::build(configuration.clone())
+        .expect("initialize application should success");
+    let address = format!("http://127.0.0.1:{}", application.port());
+    let _ = async_std::task::spawn(application.run_until_stopped());
     TestApp {
-        address: format!("http://127.0.0.1:{port}"),
+        address,
         db_pool: connection_pool,
     }
 }
