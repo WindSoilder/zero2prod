@@ -1,6 +1,6 @@
-use sqlx::PgPool;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 
-use crate::configuration::Settings;
+use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{health_check, subscribe};
 use crate::State;
@@ -27,10 +27,7 @@ impl Application {
             configuration.email_client.authorization_token,
             timeout,
         );
-        let server = get_server(
-            PgPool::connect_lazy_with(configuration.database.with_db()),
-            email_client,
-        );
+        let server = get_server(get_connection_pool(&configuration.database), email_client);
         let listener = TcpListener::bind(format!(
             "{}:{}",
             configuration.application.host, configuration.application.port
@@ -51,6 +48,12 @@ impl Application {
     pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
         self.server.listen(self.listener).await
     }
+}
+
+fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
+    PgPoolOptions::new()
+        .acquire_timeout(std::time::Duration::from_secs(2))
+        .connect_lazy_with(configuration.with_db())
 }
 
 fn get_server(db_pool: PgPool, email_client: EmailClient) -> tide::Server<State> {
