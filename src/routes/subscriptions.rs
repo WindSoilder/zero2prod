@@ -76,6 +76,7 @@ pub async fn send_confirmation_email(
 ) -> std::result::Result<(), surf::Error> {
     // Send a (useless) email to the new subscriber.
     // We are ignoring email delivery errors for now.
+    // [TODO]: I don't think this should be my-api.com, we need to make it configurable
     let confirmation_link = "https://my-api.com/subscriptions/confirm";
     email_client
         .send_email(
@@ -101,7 +102,7 @@ async fn insert_subscriber(
     sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at, status)
-        VALUES ($1, $2, $3, $4, 'confirmed')
+        VALUES ($1, $2, $3, $4, 'pending_confirmation')
         "#,
         Uuid::new_v4(),
         new_subscriber.email.as_ref(),
