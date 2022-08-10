@@ -1,4 +1,4 @@
-use crate::Request;
+use crate::{EmailClient, Request};
 
 use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
 use chrono::Utc;
@@ -23,7 +23,12 @@ pub async fn subscribe(mut req: Request) -> Result {
         Ok(subscriber) => subscriber,
         Err(_) => return Ok(Response::builder(StatusCode::BadRequest).build()),
     };
-    add_subscriber(&new_subscriber, &req.state().connection).await
+    add_subscriber(
+        new_subscriber,
+        &req.state().connection,
+        &req.state().email_client,
+    )
+    .await
 }
 
 impl TryFrom<SubscribeBody> for NewSubscriber {
@@ -40,14 +45,32 @@ impl TryFrom<SubscribeBody> for NewSubscriber {
 // Because it already have a `name` field for Layer.
 #[tracing::instrument(
     name = "Adding a new subscriber",
-    skip(pool),
+    skip(pool, email_client),
     fields(request_id = %Uuid::new_v4())
 )]
-async fn add_subscriber(new_subscriber: &NewSubscriber, pool: &PgPool) -> Result {
-    match insert_subscriber(new_subscriber, pool).await {
-        Ok(_) => Ok("".into()),
-        Err(_) => Ok(Response::builder(StatusCode::InternalServerError).build()),
+async fn add_subscriber(
+    new_subscriber: NewSubscriber,
+    pool: &PgPool,
+    email_client: &EmailClient,
+) -> Result {
+    if insert_subscriber(&new_subscriber, pool).await.is_err() {
+        return Ok(Response::builder(StatusCode::InternalServerError).build());
     }
+    // Send a (useless) email to the new subscriber.
+    // We are ignoring email delivery errors for now.
+    if email_client
+        .send_email(
+            new_subscriber.email,
+            "Welcome",
+            "Welcome to our newsletter",
+            "Welcome to our newsletter",
+        )
+        .await
+        .is_err()
+    {
+        return Ok(Response::builder(StatusCode::InternalServerError).build());
+    }
+    Ok("".into())
 }
 
 #[tracing::instrument(name = "Savning new subscriber details in the database")]

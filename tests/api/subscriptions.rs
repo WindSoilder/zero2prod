@@ -1,11 +1,21 @@
 use crate::helpers::{spawn_app, Subscription};
 use serde::{Deserialize, Serialize};
 use surf::http::{Method, Url};
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, ResponseTemplate};
 
 #[async_std::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange
     let test_app = spawn_app().await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&test_app.email_server)
+        .await;
+
     let response = test_app
         .post_subscriptions(&Subscription {
             name: Some("le guin".to_string()),
@@ -116,4 +126,24 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_empty() {
             description
         )
     }
+}
+
+#[async_std::test]
+async fn subscribe_sends_a_confirmation_email_for_valid_data() {
+    // Arrange
+    let app = spawn_app().await;
+    let body = Subscription {
+        name: Some("le guin".to_string()),
+        email: Some("ursula_le_guin@gmail.com".to_string()),
+    };
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    // Act
+    app.post_subscriptions(&body).await;
 }

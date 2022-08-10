@@ -3,12 +3,14 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use surf::Url;
 use uuid::Uuid;
+use wiremock::MockServer;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+    pub email_server: MockServer,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -51,10 +53,14 @@ pub async fn spawn_app() -> TestApp {
     // All other invocations will instead skip execution.
     Lazy::force(&TRACING);
 
+    // Launch a mock server to stand in for Postmark's API
+    let email_server = MockServer::start().await;
+
     let configuration = {
         let mut c = get_configuration().expect("Failed to read configuration.");
         c.application.port = 0;
         c.database.database_name = Uuid::new_v4().to_string();
+        c.email_client.base_url = email_server.uri();
         c
     };
     let connection_pool = configure_database(&configuration.database).await;
@@ -66,6 +72,7 @@ pub async fn spawn_app() -> TestApp {
     TestApp {
         address,
         db_pool: connection_pool,
+        email_server,
     }
 }
 
