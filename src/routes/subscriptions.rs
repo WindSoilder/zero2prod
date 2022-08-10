@@ -56,10 +56,28 @@ async fn add_subscriber(
     if insert_subscriber(&new_subscriber, pool).await.is_err() {
         return Ok(Response::builder(StatusCode::InternalServerError).build());
     }
+    if send_confirmation_email(email_client, new_subscriber)
+        .await
+        .is_err()
+    {
+        return Ok(Response::builder(StatusCode::InternalServerError).build());
+    }
+
+    Ok("".into())
+}
+
+#[tracing::instrument(
+    name = "Send a confirmation email to a new subscriber",
+    skip(email_client, new_subscriber)
+)]
+pub async fn send_confirmation_email(
+    email_client: &EmailClient,
+    new_subscriber: NewSubscriber,
+) -> std::result::Result<(), surf::Error> {
     // Send a (useless) email to the new subscriber.
     // We are ignoring email delivery errors for now.
     let confirmation_link = "https://my-api.com/subscriptions/confirm";
-    if email_client
+    email_client
         .send_email(
             new_subscriber.email,
             "Welcome",
@@ -73,11 +91,6 @@ async fn add_subscriber(
 
         )
         .await
-        .is_err()
-    {
-        return Ok(Response::builder(StatusCode::InternalServerError).build());
-    }
-    Ok("".into())
 }
 
 #[tracing::instrument(name = "Savning new subscriber details in the database")]
