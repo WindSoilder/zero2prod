@@ -44,7 +44,7 @@ let-env PGPASSWORD = $DB_PASSWORD
         # TODO: make it prints to stderr.
         print "Postgres is still unavailable - sleeping"
         sleep 3sec
-        $it
+        $it | ignore
     }
 }
 
