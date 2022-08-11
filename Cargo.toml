@@ -24,6 +24,7 @@ serde-aux = "3"
 unicode-segmentation = "1"
 validator = "0.16.0"
 surf = "2.3.2"
+rand = { version = "0.8", features = ["std_rng"] }
 
 # Using table-like toml syntax to avoid a super-long line!
 [dependencies.sqlx]
