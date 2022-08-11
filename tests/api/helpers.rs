@@ -20,6 +20,12 @@ pub struct Subscription {
     pub email: Option<String>,
 }
 
+/// Confirmation links embedded in the request to the email API.
+pub struct ConfirmationLinks {
+    pub html: Url,
+    pub plain_text: Url,
+}
+
 impl TestApp {
     pub async fn post_subscriptions(&self, body: &Subscription) -> surf::Response {
         let url = Url::parse(&format!("{}/subscriptions", self.address))
@@ -32,6 +38,30 @@ impl TestApp {
             .send(request)
             .await
             .expect("Failed to execute request.")
+    }
+
+    pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
+        // Parse the body as JSON, starting from raw bytes
+        let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
+
+        // Extract the link from one of the request fields.
+        let get_link = |s: &str| {
+            let links: Vec<_> = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == linkify::LinkKind::Url)
+                .collect();
+            assert_eq!(links.len(), 1);
+            let raw_link = links[0].as_str().to_owned();
+            let mut confirmation_link = Url::parse(&raw_link).unwrap();
+            // Let's make sure we don't call random APIs on the web
+            assert_eq!(confirmation_link.host_str().unwrap(), "127.0.0.1");
+            confirmation_link.set_port(Some(self.port)).unwrap();
+            confirmation_link
+        };
+
+        let html = get_link(&body["HtmlBody"].as_str().unwrap());
+        let plain_text = get_link(&body["TextBody"].as_str().unwrap());
+        ConfirmationLinks { html, plain_text }
     }
 }
 
