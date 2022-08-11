@@ -2,7 +2,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool};
 
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{health_check, subscribe};
+use crate::routes::{health_check, subscribe, confirm};
 use crate::State;
 use std::net::TcpListener;
 use tide_tracing::TraceMiddleware;
@@ -62,5 +62,6 @@ fn get_server(db_pool: PgPool, email_client: EmailClient) -> tide::Server<State>
     app.with(TraceMiddleware::new());
     app.at("/health_check").get(health_check);
     app.at("/subscriptions").post(subscribe);
+    app.at("/subscriptions/confirm").get(confirm);
     app
 }
