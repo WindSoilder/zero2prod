@@ -27,8 +27,8 @@ impl EmailClient {
 
         Self {
             http_client: client,
-            base_url: base_url,
-            sender: sender,
+            base_url,
+            sender,
             authorization_token,
         }
     }

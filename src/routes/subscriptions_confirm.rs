@@ -14,13 +14,13 @@ struct Parameters {
 pub async fn confirm(req: Request) -> Result {
     let parameters: Parameters = req.query()?;
     let pool = &req.state().connection;
-    let id = match get_subscriber_id_from_token(&pool, &parameters.subscription_token).await {
+    let id = match get_subscriber_id_from_token(pool, &parameters.subscription_token).await {
         Ok(id) => id,
         Err(_) => return Ok(Response::builder(StatusCode::InternalServerError).build()),
     };
     match id {
         // Non-exists token!
-        None => return Ok(Response::builder(StatusCode::Unauthorized).build()),
+        None => Ok(Response::builder(StatusCode::Unauthorized).build()),
         Some(subscriber_id) => {
             if confirm_subscriber(pool, subscriber_id).await.is_err() {
                 return Ok(Response::builder(StatusCode::InternalServerError).build());
