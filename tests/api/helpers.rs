@@ -11,6 +11,7 @@ pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
     pub email_server: MockServer,
+    pub port: u16,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -67,12 +68,14 @@ pub async fn spawn_app() -> TestApp {
 
     let application = zero2prod::Application::build(configuration.clone())
         .expect("initialize application should success");
-    let address = format!("http://127.0.0.1:{}", application.port());
+    let application_port = application.port();
+    let address = format!("http://127.0.0.1:{}", application_port);
     let _ = async_std::task::spawn(application.run_until_stopped());
     TestApp {
         address,
         db_pool: connection_pool,
         email_server,
+        port: application_port,
     }
 }
 

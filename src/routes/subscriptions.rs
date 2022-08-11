@@ -27,6 +27,7 @@ pub async fn subscribe(mut req: Request) -> Result {
         new_subscriber,
         &req.state().connection,
         &req.state().email_client,
+        &req.state().base_url,
     )
     .await
 }
@@ -52,11 +53,12 @@ async fn add_subscriber(
     new_subscriber: NewSubscriber,
     pool: &PgPool,
     email_client: &EmailClient,
+    base_url: &str,
 ) -> Result {
     if insert_subscriber(&new_subscriber, pool).await.is_err() {
         return Ok(Response::builder(StatusCode::InternalServerError).build());
     }
-    if send_confirmation_email(email_client, new_subscriber)
+    if send_confirmation_email(email_client, new_subscriber, base_url)
         .await
         .is_err()
     {
@@ -73,11 +75,11 @@ async fn add_subscriber(
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
+    base_url: &str,
 ) -> std::result::Result<(), surf::Error> {
     // Send a (useless) email to the new subscriber.
     // We are ignoring email delivery errors for now.
-    // [TODO]: I don't think this should be my-api.com, we need to make it configurable
-    let confirmation_link = "https://my-api.com/subscriptions/confirm";
+    let confirmation_link = format!("{base_url}/subscriptions/confirm?subscription_token=mytoken");
     email_client
         .send_email(
             new_subscriber.email,

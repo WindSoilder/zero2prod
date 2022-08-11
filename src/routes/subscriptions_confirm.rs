@@ -9,6 +9,6 @@ struct Parameters {
 
 #[tracing::instrument(name = "Confirm a pending subscriber", skip(req))]
 pub async fn confirm(mut req: Request) -> Result {
-    let token = req.query()?;
+    let token: Parameters = req.query()?;
     return Ok("".into());
 }

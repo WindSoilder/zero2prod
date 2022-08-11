@@ -13,13 +13,15 @@ pub use startup::Application;
 pub struct State {
     connection: PgPool,
     email_client: EmailClient,
+    base_url: String,
 }
 
 impl State {
-    pub fn new(pg_pool: PgPool, email_client: EmailClient) -> Self {
+    pub fn new(pg_pool: PgPool, email_client: EmailClient, base_url: String) -> Self {
         State {
             connection: pg_pool,
             email_client,
+            base_url,
         }
     }
 }
