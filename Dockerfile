@@ -21,8 +21,6 @@ RUN cargo build --release
 
 FROM debian:bullseye-slim AS runtime
 WORKDIR /app
-# surf requires libcurl.
-RUN apt install libcurl-dev
 COPY --from=builder /app/target/release/zero2prod ./zero2prod
 COPY configuration ./configuration
 ENV APP_ENVIRONMENT production
