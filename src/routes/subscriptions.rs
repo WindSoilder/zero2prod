@@ -6,6 +6,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use sqlx::{Postgres, Transaction};
 use tide::Result;
 use tide::{Response, StatusCode};
 use uuid::Uuid;
@@ -25,6 +26,7 @@ pub async fn subscribe(mut req: Request) -> Result {
         Ok(subscriber) => subscriber,
         Err(_) => return Ok(Response::builder(StatusCode::BadRequest).build()),
     };
+
     add_subscriber(
         new_subscriber,
         &req.state().connection,
@@ -57,12 +59,16 @@ async fn add_subscriber(
     email_client: &EmailClient,
     base_url: &str,
 ) -> Result {
-    let subscriber_id = match insert_subscriber(&new_subscriber, pool).await {
+    let mut transaction = match pool.begin().await {
+        Ok(transaction) => transaction,
+        Err(_) => return Ok(Response::builder(StatusCode::InternalServerError).build()),
+    };
+    let subscriber_id = match insert_subscriber(&new_subscriber, &mut transaction).await {
         Ok(subscriber_id) => subscriber_id,
         Err(_) => return Ok(Response::builder(StatusCode::InternalServerError).build()),
     };
     let subscriber_token = generate_subscription_token();
-    if store_token(pool, subscriber_id, &subscriber_token)
+    if store_token(&mut transaction, subscriber_id, &subscriber_token)
         .await
         .is_err()
     {
@@ -75,16 +81,19 @@ async fn add_subscriber(
     {
         return Ok(Response::builder(StatusCode::InternalServerError).build());
     }
+    if transaction.commit().await.is_err() {
+        return Ok(Response::builder(StatusCode::InternalServerError).build());
+    }
 
     Ok("".into())
 }
 
 #[tracing::instrument(
     name = "Store subscription token in the database",
-    skip(subscription_token, pool)
+    skip(subscription_token, transaction)
 )]
 pub async fn store_token(
-    pool: &PgPool,
+    transaction: &mut Transaction<'_, Postgres>,
     subscriber_id: Uuid,
     subscription_token: &str,
 ) -> std::result::Result<(), sqlx::Error> {
@@ -94,7 +103,7 @@ pub async fn store_token(
         subscription_token,
         subscriber_id
     )
-    .execute(pool)
+    .execute(transaction)
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);
@@ -136,7 +145,7 @@ pub async fn send_confirmation_email(
 #[tracing::instrument(name = "Savning new subscriber details in the database")]
 async fn insert_subscriber(
     new_subscriber: &NewSubscriber,
-    pool: &PgPool,
+    transaction: &mut Transaction<'_, Postgres>,
 ) -> std::result::Result<Uuid, sqlx::Error> {
     let subscriber_id = Uuid::new_v4();
     sqlx::query!(
@@ -149,7 +158,7 @@ async fn insert_subscriber(
         new_subscriber.name.as_ref(),
         Utc::now()
     )
-    .execute(pool)
+    .execute(transaction)
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {e:?}");
