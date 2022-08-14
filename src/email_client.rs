@@ -56,7 +56,7 @@ impl EmailClient {
                 self.authorization_token.expose_secret(),
             )
             .body_json(&request_body)?;
-        let response = req_builder.await?;
+        let mut response = req_builder.await?;
         let resp_status = response.status();
         if resp_status.is_client_error() || resp_status.is_server_error() {
             let response_body = response.body_string().await;
