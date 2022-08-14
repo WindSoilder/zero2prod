@@ -59,7 +59,11 @@ impl EmailClient {
         let response = req_builder.await?;
         let resp_status = response.status();
         if resp_status.is_client_error() || resp_status.is_server_error() {
-            tracing::error!("Failed to send email, response message: {:?}", response.body_string());
+            let response_body = response.body_string().await;
+            tracing::error!(
+                "Failed to send email, response message: {:?}",
+                response_body
+            );
             return Err(surf::Error::from_str(
                 resp_status,
                 "Get error status code from server",
