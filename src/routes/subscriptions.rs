@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::{EmailClient, Request};
 
 use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
@@ -68,12 +70,7 @@ async fn add_subscriber(
         Err(_) => return Ok(Response::builder(StatusCode::InternalServerError).build()),
     };
     let subscriber_token = generate_subscription_token();
-    if store_token(&mut transaction, subscriber_id, &subscriber_token)
-        .await
-        .is_err()
-    {
-        return Ok(Response::builder(StatusCode::InternalServerError).build());
-    }
+    store_token(&mut transaction, subscriber_id, &subscriber_token).await?;
 
     if send_confirmation_email(email_client, new_subscriber, base_url, &subscriber_token)
         .await
@@ -96,7 +93,7 @@ pub async fn store_token(
     transaction: &mut Transaction<'_, Postgres>,
     subscriber_id: Uuid,
     subscription_token: &str,
-) -> std::result::Result<(), sqlx::Error> {
+) -> std::result::Result<(), StoreTokenError> {
     sqlx::query!(
         r#"INSERT INTO subscription_tokens (subscription_token, subscriber_id)
         VALUES ($1, $2)"#,
@@ -107,7 +104,7 @@ pub async fn store_token(
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);
-        e
+        StoreTokenError(e)
     })?;
     Ok(())
 }
@@ -174,3 +171,14 @@ fn generate_subscription_token() -> String {
         .take(25)
         .collect()
 }
+
+#[derive(Debug)]
+pub struct StoreTokenError(sqlx::Error);
+
+impl std::fmt::Display for StoreTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "database error occured: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for StoreTokenError {}
