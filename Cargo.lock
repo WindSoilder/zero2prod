@@ -3251,6 +3251,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "surf",
+ "thiserror",
  "tide",
  "tide-tracing",
  "tracing",

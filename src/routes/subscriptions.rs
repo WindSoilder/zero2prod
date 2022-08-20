@@ -181,51 +181,20 @@ impl From<sqlx::Error> for StoreTokenError {
     }
 }
 
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
 enum SubscribeError {
+    #[error("{0}")]
     ValidationError(String),
-    StoreTokenError(StoreTokenError),
+    #[error("Failed to store the confirmation token for a new subscriber.")]
+    StoreTokenError(#[source] StoreTokenError),
+    #[error("Failed to send a confirmation email: {0:?}")]
     SendEmailError(surf::Error),
-    PoolError(sqlx::Error),
+    #[error("Failed to acquire a Progres connection from the pool.")]
+    PoolError(#[source] sqlx::Error),
+    #[error("Failed to insert new subscriber in the databse.")]
     InsertSubscriberError(sqlx::Error),
+    #[error("Failed to commit SQL transaction to store a new subscriber")]
     TransactionCommitError(sqlx::Error),
-}
-
-impl std::fmt::Display for SubscribeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SubscribeError::ValidationError(e) => write!(f, "{}", e),
-            SubscribeError::StoreTokenError(_) => write!(
-                f,
-                "Failed to store the confirmation token for a new subscriber."
-            ),
-            SubscribeError::SendEmailError(_) => write!(f, "Failed to send a confirmation email."),
-            SubscribeError::PoolError(_) => {
-                write!(f, "Failed to acquire a Postgres connection from the pool")
-            }
-            SubscribeError::InsertSubscriberError(_) => {
-                write!(f, "Failed to insert new subscriber in the database.")
-            }
-            SubscribeError::TransactionCommitError(_) => write!(
-                f,
-                "Failed to commit SQL transaction to storee a new subscriber."
-            ),
-        }
-    }
-}
-
-impl std::error::Error for SubscribeError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            // &str does not implement `Error` - we consider it the root cause.
-            SubscribeError::ValidationError(_) => None,
-            SubscribeError::StoreTokenError(e) => Some(e),
-            SubscribeError::SendEmailError(e) => Some(e.as_ref()),
-            SubscribeError::PoolError(e) => Some(e),
-            SubscribeError::InsertSubscriberError(e) => Some(e),
-            SubscribeError::TransactionCommitError(e) => Some(e),
-        }
-    }
 }
 
 impl From<tide::Error> for SubscribeError {
