@@ -26,6 +26,7 @@ validator = "0.16.0"
 surf = { version = "2.3.2", default-features = false, features = ["h1-client-rustls", "middleware-logger", "encoding"] }
 rand = { version = "0.8", features = ["std_rng"] }
 thiserror = "1"
+anyhow = "1"
 
 # Using table-like toml syntax to avoid a super-long line!
 [dependencies.sqlx]

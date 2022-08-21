@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use crate::{EmailClient, Request};
 
 use crate::domain::{NewSubscriber, SubscriberEmail, SubscriberName};
+use anyhow::Context;
 use chrono::Utc;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -24,9 +25,9 @@ pub async fn subscribe(mut req: Request) -> Result {
         e.set_status(400);
         e
     })?;
-    let new_subscriber = subscribe_body
-        .try_into()
-        .map_err(|e| tide::Error::new(StatusCode::BadRequest, SubscribeError::from(e)))?;
+    let new_subscriber = subscribe_body.try_into().map_err(|e| {
+        tide::Error::new(StatusCode::BadRequest, SubscribeError::ValidationError(e))
+    })?;
 
     add_subscriber(
         new_subscriber,
@@ -60,19 +61,25 @@ async fn add_subscriber(
     email_client: &EmailClient,
     base_url: &str,
 ) -> Result {
-    let mut transaction = pool.begin().await.map_err(SubscribeError::PoolError)?;
+    let mut transaction = pool
+        .begin()
+        .await
+        .context("Failed to acquire a Postgres connection from the pool")?;
     let subscriber_id = insert_subscriber(&new_subscriber, &mut transaction)
         .await
-        .map_err(SubscribeError::InsertSubscriberError)?;
+        .context("Failed to insert new subscriber in the database.")?;
     let subscription_token = generate_subscription_token();
     store_token(&mut transaction, subscriber_id, &subscription_token)
         .await
-        .map_err(|e| SubscribeError::from(e))?;
-    send_confirmation_email(email_client, new_subscriber, base_url, &subscription_token).await?;
+        .context("Failed to store the confirmation token for a new subscriber.")?;
+    send_confirmation_email(email_client, new_subscriber, base_url, &subscription_token)
+        .await
+        .map_err(|e| e.into_inner())
+        .context("Failed to send a confirmation email.")?;
     transaction
         .commit()
         .await
-        .map_err(SubscribeError::TransactionCommitError)?;
+        .context("Failed to commit SQL transaction to store a new subscriber.")?;
 
     Ok("".into())
 }
@@ -144,11 +151,7 @@ async fn insert_subscriber(
         Utc::now()
     )
     .execute(transaction)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {e:?}");
-        e
-    })?;
+    .await?;
     Ok(subscriber_id)
 }
 
@@ -185,29 +188,12 @@ impl From<sqlx::Error> for StoreTokenError {
 enum SubscribeError {
     #[error("{0}")]
     ValidationError(String),
-    #[error("Failed to store the confirmation token for a new subscriber.")]
-    StoreTokenError(#[source] StoreTokenError),
-    #[error("Failed to send a confirmation email: {0:?}")]
-    SendEmailError(surf::Error),
-    #[error("Failed to acquire a Progres connection from the pool.")]
-    PoolError(#[source] sqlx::Error),
-    #[error("Failed to insert new subscriber in the databse.")]
-    InsertSubscriberError(sqlx::Error),
-    #[error("Failed to commit SQL transaction to store a new subscriber")]
-    TransactionCommitError(sqlx::Error),
+    // Transparent delegates both `Display`'s and `source`'s implementation
+    // to the type wrapped by `UnexpectedError`.
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
 }
 
-impl From<tide::Error> for SubscribeError {
-    fn from(e: tide::Error) -> Self {
-        Self::SendEmailError(e)
-    }
-}
-
-impl From<StoreTokenError> for SubscribeError {
-    fn from(e: StoreTokenError) -> Self {
-        Self::StoreTokenError(e)
-    }
-}
 impl From<String> for SubscribeError {
     fn from(e: String) -> Self {
         Self::ValidationError(e)
