@@ -120,7 +120,7 @@ pub async fn send_confirmation_email(
         format!("{base_url}/subscriptions/confirm?subscription_token={subscription_token}");
     email_client
         .send_email(
-            new_subscriber.email,
+            &new_subscriber.email,
             "Welcome",
             &format!(
                 "Welcome to our newsletter!<br />\

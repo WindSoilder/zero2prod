@@ -39,13 +39,17 @@ async fn publish_impl(pool: &PgPool, email_client: &EmailClient, body: BodyData)
     for s in subscribers {
         match s {
             Ok(s) => {
-                let email = s.email.clone();
                 email_client
-                    .send_email(s.email, &body.title, &body.content.html, &body.content.text)
+                    .send_email(
+                        &s.email,
+                        &body.title,
+                        &body.content.html,
+                        &body.content.text,
+                    )
                     .await
                     .map_err(|e| e.into_inner())
                     .with_context(|| {
-                        format!("Failed to send newsletter issue to {}", email.as_ref())
+                        format!("Failed to send newsletter issue to {}", s.email.as_ref())
                     })?;
             }
             Err(error) => {
