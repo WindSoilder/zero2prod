@@ -40,6 +40,18 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
+    pub async fn post_newsletters(&self, body: serde_json::Value) -> surf::Response {
+        let url = Url::parse(&format!("{}/newsletters", self.address))
+            .expect("failed to parse url address");
+        let client = surf::client();
+        let mut request = surf::post(url).build();
+        request.body_json(&body).unwrap();
+        client
+            .send(request)
+            .await
+            .expect("Failed to execute request.")
+    }
+
     pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
         // Parse the body as JSON, starting from raw bytes
         let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();

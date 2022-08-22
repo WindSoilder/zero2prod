@@ -1,5 +1,5 @@
 use crate::helpers::{spawn_app, ConfirmationLinks, Subscription, TestApp};
-use surf::{StatusCode, Url};
+use surf::StatusCode;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
@@ -23,14 +23,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
             "html": "<p>Newsletter body as HTML</p>"
         }
     });
-    let url =
-        Url::parse(&format!("{}/newsletters", app.address)).expect("failed to parse url address");
-    let response = surf::post(url)
-        .body_json(&newsletter_request_body)
-        .expect("Failed to set body json")
-        .await
-        .expect("Failed to execute request");
-
+    let response = app.post_newsletters(newsletter_request_body).await;
     // Assert
     assert_eq!(response.status(), StatusCode::Ok);
 }
@@ -53,16 +46,38 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
         "title": "Newsletter title",
         "html": "<p>Newsletter body as HTML</p>"
     });
-    let url =
-        Url::parse(&format!("{}/newsletters", app.address)).expect("failed to parse url address");
-    let response = surf::post(url)
-        .body_json(&newsletter_request_body)
-        .expect("Failed to set body json")
-        .await
-        .expect("Failed to execute request");
+    let response = app.post_newsletters(newsletter_request_body).await;
 
     // Assert
     assert_eq!(response.status(), StatusCode::Ok);
+}
+
+#[async_std::test]
+async fn newsletters_returns_400_for_invalid_data() {
+    // Arrange
+    let app = spawn_app().await;
+    let test_cases = vec![
+        (
+            serde_json::json!({"content": {"text": "Newsletter body as plain text", "html": "<p>Newsletter body as HTML</p>"}}),
+            "missing title",
+        ),
+        (
+            serde_json::json!({"title": "Newsletter!"}),
+            "missing content",
+        ),
+    ];
+
+    for (invalid_body, error_message) in test_cases {
+        let response = app.post_newsletters(invalid_body).await;
+
+        // Assert
+        assert_eq!(
+            StatusCode::BadRequest,
+            response.status(),
+            "The API did not fail with 400 Bad Request when thee payload was {}.",
+            error_message
+        )
+    }
 }
 
 /// Use the public API of the application under test to create an unconfirmed subscriber.
