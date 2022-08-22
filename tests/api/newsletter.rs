@@ -44,7 +44,10 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
     // Act
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
-        "html": "<p>Newsletter body as HTML</p>"
+        "content": {
+            "text": "Newsletter body as plain text",
+            "html": "<p>Newsletter body as HTML</p>"
+        }
     });
     let response = app.post_newsletters(newsletter_request_body).await;
 
