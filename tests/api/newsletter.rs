@@ -83,6 +83,36 @@ async fn newsletters_returns_400_for_invalid_data() {
     }
 }
 
+#[async_std::test]
+async fn requests_missing_authorization_are_rejected() {
+    // Arrange
+    let app = spawn_app().await;
+
+    let response = surf::post(format!("{}/newsletters", &app.address))
+        .body_json(&serde_json::json! ({
+            "title": "Newsletter title",
+            "content": {
+                "text": "Newsletter body as plain text",
+                "html": "<p>Newsletter body as HTML</p>"
+            }
+        }))
+        .unwrap()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert
+    assert_eq!(StatusCode::Unauthorized, response.status());
+    assert_eq!(
+        r#"Basic realm="publish""#,
+        response
+            .header("WWW-Authenticate")
+            .unwrap()
+            .get(0)
+            .unwrap()
+            .as_str()
+    );
+}
+
 /// Use the public API of the application under test to create an unconfirmed subscriber.
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
     let body = Subscription {

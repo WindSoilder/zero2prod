@@ -3239,10 +3239,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-std",
+ "base64 0.13.0",
  "chrono",
  "claim",
  "config 0.13.2",
  "fake",
+ "http-types",
  "linkify",
  "once_cell",
  "rand 0.8.5",

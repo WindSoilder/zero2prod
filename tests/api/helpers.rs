@@ -46,6 +46,7 @@ impl TestApp {
         let client = surf::client();
         let mut request = surf::post(url).build();
         request.body_json(&body).unwrap();
+        attach_random_basic_auth(&mut request);
         client
             .send(request)
             .await
@@ -140,4 +141,15 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("Failed to migrate the database");
     connection_pool
+}
+
+fn attach_random_basic_auth(req: &mut surf::Request) {
+    let name = Uuid::new_v4().to_string();
+    let password = Uuid::new_v4().to_string();
+    let encode_credentials =
+        base64::encode_config(format!("{}:{}", name, password), base64::STANDARD);
+    req.append_header(
+        http_types::headers::AUTHORIZATION,
+        format!("Basic {encode_credentials}"),
+    )
 }

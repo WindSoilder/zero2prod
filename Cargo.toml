@@ -27,6 +27,8 @@ surf = { version = "2.3.2", default-features = false, features = ["h1-client-rus
 rand = { version = "0.8", features = ["std_rng"] }
 thiserror = "1"
 anyhow = "1"
+base64 = "0.13"
+http-types = "2.12"
 
 # Using table-like toml syntax to avoid a super-long line!
 [dependencies.sqlx]
