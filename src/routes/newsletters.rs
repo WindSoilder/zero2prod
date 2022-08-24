@@ -3,11 +3,10 @@ use crate::email_client::EmailClient;
 use crate::Request;
 use anyhow::Context;
 use http_types::headers;
-use secrecy::Secret;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use tide::Result;
 use tide::StatusCode;
-
 #[derive(serde::Deserialize)]
 pub struct BodyData {
     title: String,
@@ -25,7 +24,7 @@ struct ConfirmedSubscriber {
 }
 
 pub async fn publish_newsletter(mut req: Request) -> Result {
-    let _credentials = match basic_authentication(&req) {
+    let credentials = match basic_authentication(&req) {
         Ok(c) => c,
         Err(e) => {
             let mut response: tide::Response = tide::Error::new(StatusCode::Unauthorized, e).into();
@@ -38,6 +37,14 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
         e
     })?;
     let pool = &req.state().connection;
+    let user_id = match validate_credentials(credentials, pool).await {
+        Ok(u) => u,
+        Err(e) => {
+            let mut response: tide::Response = tide::Error::new(StatusCode::Unauthorized, e).into();
+            response.append_header(headers::WWW_AUTHENTICATE, r#"Basic realm="publish""#);
+            return Ok(response);
+        }
+    };
     let email_client = &req.state().email_client;
     publish_impl(pool, email_client, body).await?;
 
@@ -78,6 +85,28 @@ fn basic_authentication(req: &Request) -> std::result::Result<Credentials, anyho
         username,
         password: Secret::new(password),
     })
+}
+
+async fn validate_credentials(
+    credentials: Credentials,
+    pool: &PgPool,
+) -> std::result::Result<uuid::Uuid, anyhow::Error> {
+    let user_id: Option<_> = sqlx::query!(
+        r#"
+        SELECT user_id
+        FROM users
+        WHERE username = $1 AND password = $2
+        "#,
+        credentials.username,
+        credentials.password.expose_secret()
+    )
+    .fetch_optional(pool)
+    .await
+    .context("Failed to perform a query to validate auth credentials.")?;
+
+    user_id
+        .map(|r| r.user_id)
+        .ok_or_else(|| anyhow::anyhow!("Invalid username or password."))
 }
 
 async fn publish_impl(pool: &PgPool, email_client: &EmailClient, body: BodyData) -> Result {
