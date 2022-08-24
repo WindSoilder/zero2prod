@@ -29,6 +29,7 @@ thiserror = "1"
 anyhow = "1"
 base64 = "0.13"
 http-types = "2.12"
+sha3 = "0.9"
 
 # Using table-like toml syntax to avoid a super-long line!
 [dependencies.sqlx]
