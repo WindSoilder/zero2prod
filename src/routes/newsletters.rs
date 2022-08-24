@@ -24,6 +24,7 @@ struct ConfirmedSubscriber {
 }
 
 pub async fn publish_newsletter(mut req: Request) -> Result {
+    // [todo]: may need to refactor auth error handling code
     let credentials = match basic_authentication(&req) {
         Ok(c) => c,
         Err(e) => {
