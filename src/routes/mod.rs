@@ -4,6 +4,6 @@ mod subscriptions;
 mod subscriptions_confirm;
 
 pub use health_check::health_check;
-pub use newsletters::publish_newsletter;
+pub use newsletters::{publish_newsletter, PublishError};
 pub use subscriptions::subscribe;
 pub use subscriptions_confirm::confirm;

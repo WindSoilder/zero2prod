@@ -2,7 +2,6 @@ use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::Request;
 use anyhow::Context;
-use http_types::headers;
 use secrecy::{ExposeSecret, Secret};
 use sha3::Digest;
 use sqlx::PgPool;
@@ -25,28 +24,15 @@ struct ConfirmedSubscriber {
 }
 
 pub async fn publish_newsletter(mut req: Request) -> Result {
-    // [todo]: may need to refactor auth error handling code
-    let credentials = match basic_authentication(&req) {
-        Ok(c) => c,
-        Err(e) => {
-            let mut response: tide::Response = tide::Error::new(StatusCode::Unauthorized, e).into();
-            response.append_header(headers::WWW_AUTHENTICATE, r#"Basic realm="publish""#);
-            return Ok(response);
-        }
-    };
+    let credentials = basic_authentication(&req).map_err(PublishError::AuthError)?;
     let body: BodyData = req.body_json().await.map_err(|mut e| {
         e.set_status(StatusCode::BadRequest);
         e
     })?;
     let pool = &req.state().connection;
-    let user_id = match validate_credentials(credentials, pool).await {
-        Ok(u) => u,
-        Err(e) => {
-            let mut response: tide::Response = tide::Error::new(StatusCode::Unauthorized, e).into();
-            response.append_header(headers::WWW_AUTHENTICATE, r#"Basic realm="publish""#);
-            return Ok(response);
-        }
-    };
+    let user_id = validate_credentials(credentials, pool)
+        .await
+        .map_err(PublishError::AuthError)?;
     let email_client = &req.state().email_client;
     publish_impl(pool, email_client, body).await?;
 
@@ -168,6 +154,8 @@ async fn get_confirmed_subscribers(
 
 #[derive(thiserror::Error, Debug)]
 pub enum PublishError {
+    #[error("Authentication failed.")]
+    AuthError(#[source] anyhow::Error),
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }

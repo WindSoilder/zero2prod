@@ -1,10 +1,13 @@
+use http_types::headers;
 use sqlx::{postgres::PgPoolOptions, PgPool};
+use tide::StatusCode;
 
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{confirm, health_check, subscribe, publish_newsletter};
+use crate::routes::{confirm, health_check, publish_newsletter, subscribe, PublishError};
 use crate::State;
 use std::net::TcpListener;
+use tide::utils::After;
 use tide_tracing::TraceMiddleware;
 
 // A warpper for tide::Server to hold the newly built server and its port.
@@ -63,6 +66,15 @@ fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
 fn get_server(db_pool: PgPool, email_client: EmailClient, base_url: String) -> tide::Server<State> {
     let state = State::new(db_pool, email_client, base_url);
     let mut app = tide::with_state(state);
+    app.with(After(|mut res: tide::Response| async {
+        if let Some(err) = res.downcast_error::<PublishError>() {
+            if let PublishError::AuthError(_) = err {
+                res.set_status(StatusCode::Unauthorized);
+                res.append_header(headers::WWW_AUTHENTICATE, r#"Basic realm="publish""#);
+            }
+        }
+        Ok(res)
+    }));
     app.with(TraceMiddleware::new());
     app.at("/health_check").get(health_check);
     app.at("/subscriptions").post(subscribe);
