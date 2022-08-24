@@ -2,8 +2,8 @@ use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::Request;
 use anyhow::Context;
+use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
 use secrecy::{ExposeSecret, Secret};
-use sha3::Digest;
 use sqlx::PgPool;
 use tide::Result;
 use tide::StatusCode;
@@ -30,9 +30,7 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
         e
     })?;
     let pool = &req.state().connection;
-    let user_id = validate_credentials(credentials, pool)
-        .await
-        .map_err(PublishError::AuthError)?;
+    let user_id = validate_credentials(credentials, pool).await?;
     let email_client = &req.state().email_client;
     publish_impl(pool, email_client, body).await?;
 
@@ -78,26 +76,39 @@ fn basic_authentication(req: &Request) -> std::result::Result<Credentials, anyho
 async fn validate_credentials(
     credentials: Credentials,
     pool: &PgPool,
-) -> std::result::Result<uuid::Uuid, anyhow::Error> {
-    let password_hash = sha3::Sha3_256::digest(credentials.password.expose_secret().as_bytes());
-    // Lowercase hexadecimal encoding.
-    let password_hash = format!("{:x}", password_hash);
-    let user_id: Option<_> = sqlx::query!(
+) -> std::result::Result<uuid::Uuid, PublishError> {
+    let row: Option<_> = sqlx::query!(
         r#"
-        SELECT user_id
+        SELECT user_id, password_hash
         FROM users
-        WHERE username = $1 AND password_hash = $2
+        WHERE username = $1
         "#,
-        credentials.username,
-        password_hash
+        credentials.username
     )
     .fetch_optional(pool)
     .await
-    .context("Failed to perform a query to validate auth credentials.")?;
+    .context("Failed to perform a query to retrieve stored credentials.")
+    .map_err(PublishError::UnexpectedError)?;
+    let (expected_password_hash, user_id) = match row {
+        Some(row) => (row.password_hash, row.user_id),
+        None => {
+            return Err(PublishError::AuthError(anyhow::anyhow!(
+                "Unknown username."
+            )))
+        }
+    };
+    let expected_password_hash = PasswordHash::new(&expected_password_hash)
+        .context("Failed to parse hash in PHC string format.")
+        .map_err(PublishError::UnexpectedError)?;
 
-    user_id
-        .map(|r| r.user_id)
-        .ok_or_else(|| anyhow::anyhow!("Invalid username or password."))
+    Argon2::default()
+        .verify_password(
+            credentials.password.expose_secret().as_bytes(),
+            &expected_password_hash,
+        )
+        .context("Invalid password.")
+        .map_err(PublishError::AuthError)?;
+    Ok(user_id)
 }
 
 async fn publish_impl(pool: &PgPool, email_client: &EmailClient, body: BodyData) -> Result {
