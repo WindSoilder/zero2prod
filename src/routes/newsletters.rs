@@ -3,7 +3,7 @@ use crate::email_client::EmailClient;
 use crate::telemetry::spawn_blocking_with_tracing;
 use crate::Request;
 use anyhow::Context;
-use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use tide::Result;
