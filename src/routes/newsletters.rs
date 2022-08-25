@@ -1,5 +1,6 @@
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
+use crate::telemetry::spawn_blocking_with_tracing;
 use crate::Request;
 use anyhow::Context;
 use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
@@ -82,8 +83,7 @@ async fn validate_credentials(
         .await
         .map_err(PublishError::UnexpectedError)?
         .ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknown username.")))?;
-
-    async_std::task::spawn_blocking(move || {
+    spawn_blocking_with_tracing(move || {
         verify_password_hash(expected_password_hash, credentials.password)
     })
     .await?;
