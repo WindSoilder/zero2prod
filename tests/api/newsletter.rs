@@ -1,5 +1,6 @@
-use crate::helpers::{spawn_app, ConfirmationLinks, Subscription, TestApp};
+use crate::helpers::{attach_basic_auth, spawn_app, ConfirmationLinks, Subscription, TestApp};
 use surf::StatusCode;
+use uuid::Uuid;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
@@ -111,6 +112,69 @@ async fn requests_missing_authorization_are_rejected() {
             .unwrap()
             .as_str()
     );
+}
+
+#[async_std::test]
+async fn non_existing_user_is_rejected() {
+    // Arrange
+    let app = spawn_app().await;
+    // Random credentials.
+    let username = Uuid::new_v4().to_string();
+    let password = Uuid::new_v4().to_string();
+
+    let mut req = surf::post(&format!("{}/newsletters", app.address)).build();
+    attach_basic_auth(&mut req, &username, &password);
+    req.body_json(&serde_json::json!({
+        "title": "Newsletter title",
+        "content": {
+            "text": "Newsletter body as plain text",
+            "html": "<p>Newsletter body as HTML</p>"
+        }
+    }))
+    .unwrap();
+    let resp = surf::client()
+        .send(req)
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert
+    assert_eq!(StatusCode::Unauthorized, resp.status());
+    assert_eq!(
+        r#"Basic realm="publish""#,
+        resp.header("WWW-Authenticate").unwrap().as_str()
+    )
+}
+
+#[async_std::test]
+async fn invalid_password_is_rejected() {
+    // Arrange
+    let app = spawn_app().await;
+    let username = &app.test_user.username;
+    // Random password
+    let password = Uuid::new_v4().to_string();
+    assert_ne!(app.test_user.password, password);
+
+    let mut req = surf::post(&format!("{}/newsletters", app.address)).build();
+    attach_basic_auth(&mut req, &username, &password);
+    req.body_json(&serde_json::json!({
+        "title": "Newsletter title",
+        "content": {
+            "text": "Newsletter body as plain text",
+            "html": "<p>Newsletter body as HTML</p>"
+        }
+    }))
+    .unwrap();
+    let resp = surf::client()
+        .send(req)
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert
+    assert_eq!(StatusCode::Unauthorized, resp.status());
+    assert_eq!(
+        r#"Basic realm="publish""#,
+        resp.header("WWW-Authenticate").unwrap().as_str()
+    )
 }
 
 /// Use the public API of the application under test to create an unconfirmed subscriber.

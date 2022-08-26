@@ -14,7 +14,7 @@ pub struct TestApp {
     pub db_pool: PgPool,
     pub email_server: MockServer,
     pub port: u16,
-    test_user: TestUser,
+    pub test_user: TestUser,
 }
 
 pub struct TestUser {
@@ -183,7 +183,7 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
     connection_pool
 }
 
-fn attach_basic_auth(req: &mut surf::Request, name: &str, password: &str) {
+pub fn attach_basic_auth(req: &mut surf::Request, name: &str, password: &str) {
     let encode_credentials =
         base64::encode_config(format!("{}:{}", name, password), base64::STANDARD);
     req.append_header(
