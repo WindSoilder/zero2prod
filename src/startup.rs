@@ -4,7 +4,9 @@ use tide::StatusCode;
 
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
-use crate::routes::{confirm, health_check, publish_newsletter, subscribe, PublishError};
+use crate::routes::{
+    confirm, health_check, home, login, login_form, publish_newsletter, subscribe, PublishError,
+};
 use crate::State;
 use std::net::TcpListener;
 use tide::utils::After;
@@ -80,5 +82,7 @@ fn get_server(db_pool: PgPool, email_client: EmailClient, base_url: String) -> t
     app.at("/subscriptions").post(subscribe);
     app.at("/subscriptions/confirm").get(confirm);
     app.at("/newsletters").post(publish_newsletter);
+    app.at("/").get(home);
+    app.at("/login").get(login_form).post(login);
     app
 }
