@@ -16,6 +16,7 @@ pub struct TestApp {
     pub email_server: MockServer,
     pub port: u16,
     pub test_user: TestUser,
+    pub api_client: surf::Client,
 }
 
 pub struct TestUser {
@@ -68,10 +69,9 @@ impl TestApp {
         let url = Url::parse(&format!("{}/subscriptions", self.address))
             .expect("failed to parse url address");
 
-        let client = surf::client();
         let mut request = surf::post(url).build();
         request.body_form(&body).unwrap();
-        client
+        self.api_client
             .send(request)
             .await
             .expect("Failed to execute request.")
@@ -80,12 +80,11 @@ impl TestApp {
     pub async fn post_newsletters(&self, body: serde_json::Value) -> surf::Response {
         let url = Url::parse(&format!("{}/newsletters", self.address))
             .expect("failed to parse url address");
-        let client = surf::client();
         let mut request = surf::post(url).build();
         request.body_json(&body).unwrap();
         let (username, password) = (&self.test_user.username, &self.test_user.password);
         attach_basic_auth(&mut request, username, password);
-        client
+        self.api_client
             .send(request)
             .await
             .expect("Failed to execute request.")
@@ -98,13 +97,25 @@ impl TestApp {
         let url =
             Url::parse(&format!("{}/login", &self.address)).expect("failed to parse url address");
 
-        let client = surf::client();
         let mut request = surf::post(url).build();
         request.body_form(body).unwrap();
-        client
+        self.api_client
             .send(request)
             .await
             .expect("Failed to execute request.")
+    }
+
+    pub async fn get_login_html(&self) -> String {
+        let url =
+            Url::parse(&format!("{}/login", &self.address)).expect("failed to parse url address");
+        let request = surf::get(url).build();
+        self.api_client
+            .send(request)
+            .await
+            .expect("Failed to execute requiest")
+            .body_string()
+            .await
+            .unwrap()
     }
 
     pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
@@ -168,12 +179,14 @@ pub async fn spawn_app() -> TestApp {
     let application_port = application.port();
     let address = format!("http://127.0.0.1:{}", application_port);
     let _ = async_std::task::spawn(application.run_until_stopped());
+    let client = surf::client().with(surf_cookie_middleware::CookieMiddleware::new());
     let test_app = TestApp {
         address,
         db_pool: connection_pool,
         email_server,
         port: application_port,
         test_user: TestUser::generate(),
+        api_client: client,
     };
     test_app.test_user.store(&test_app.db_pool).await;
     test_app
