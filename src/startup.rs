@@ -5,7 +5,8 @@ use tide::StatusCode;
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{
-    confirm, health_check, home, login, login_form, publish_newsletter, subscribe, PublishError,
+    confirm, health_check, home, login, login_form, publish_newsletter, subscribe, LoginError,
+    PublishError,
 };
 use crate::State;
 use std::net::TcpListener;
@@ -74,7 +75,12 @@ fn get_server(db_pool: PgPool, email_client: EmailClient, base_url: String) -> t
                 res.set_status(StatusCode::Unauthorized);
                 res.append_header(headers::WWW_AUTHENTICATE, r#"Basic realm="publish""#);
             }
+        } else if let Some(err) = res.downcast_error::<LoginError>() {
+            if let LoginError::AuthError(_) = err {
+                res.set_status(StatusCode::Unauthorized);
+            }
         }
+
         Ok(res)
     }));
     app.with(TraceMiddleware::new());
