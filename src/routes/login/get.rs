@@ -1,4 +1,5 @@
 use crate::Request;
+use http_types::Cookie;
 use tide::{Response, Result};
 
 pub async fn login_form(_req: Request) -> Result {
@@ -28,5 +29,6 @@ pub async fn login_form(_req: Request) -> Result {
     );
     let mut resp: Response = body.into();
     resp.set_content_type("text/html; charset=utf-8");
+    resp.remove_cookie(Cookie::named("_flash"));
     Ok(resp)
 }
