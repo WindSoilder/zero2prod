@@ -77,7 +77,10 @@ fn get_server(db_pool: PgPool, email_client: EmailClient, base_url: String) -> t
             }
         } else if let Some(err) = res.downcast_error::<LoginError>() {
             if let LoginError::AuthError(_) = err {
-                res.set_status(StatusCode::Unauthorized);
+                let error_msg = err.to_string();
+                res.set_status(StatusCode::SeeOther);
+                res.insert_cookie(http_types::Cookie::new("_flash", error_msg));
+                res.append_header(headers::LOCATION, "/login");
             }
         }
 

@@ -1,5 +1,6 @@
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
+use http_types::StatusCode;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
@@ -84,6 +85,22 @@ impl TestApp {
         request.body_json(&body).unwrap();
         let (username, password) = (&self.test_user.username, &self.test_user.password);
         attach_basic_auth(&mut request, username, password);
+        client
+            .send(request)
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn post_login<Body>(&self, body: &Body) -> surf::Response
+    where
+        Body: serde::Serialize,
+    {
+        let url =
+            Url::parse(&format!("{}/login", &self.address)).expect("failed to parse url address");
+
+        let client = surf::client();
+        let mut request = surf::post(url).build();
+        request.body_form(body).unwrap();
         client
             .send(request)
             .await
@@ -190,4 +207,9 @@ pub fn attach_basic_auth(req: &mut surf::Request, name: &str, password: &str) {
         http_types::headers::AUTHORIZATION,
         format!("Basic {encode_credentials}"),
     )
+}
+
+pub fn assert_is_redirect_to(response: &surf::Response, location: &str) {
+    assert_eq!(response.status(), StatusCode::SeeOther);
+    assert_eq!(response.header("Location").unwrap().as_str(), location)
 }
