@@ -1,12 +1,12 @@
 use http_types::headers;
+use secrecy::Secret;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use tide::StatusCode;
 
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{
-    confirm, health_check, home, login, login_form, publish_newsletter, subscribe, LoginError,
-    PublishError,
+    confirm, health_check, home, login, login_form, publish_newsletter, subscribe, PublishError,
 };
 use crate::State;
 use std::net::TcpListener;
@@ -37,6 +37,7 @@ impl Application {
             get_connection_pool(&configuration.database),
             email_client,
             configuration.application.base_url.clone(),
+            configuration.application.hmac_secret,
         );
         let listener = TcpListener::bind(format!(
             "{}:{}",
@@ -66,8 +67,13 @@ fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
         .connect_lazy_with(configuration.with_db())
 }
 
-fn get_server(db_pool: PgPool, email_client: EmailClient, base_url: String) -> tide::Server<State> {
-    let state = State::new(db_pool, email_client, base_url);
+fn get_server(
+    db_pool: PgPool,
+    email_client: EmailClient,
+    base_url: String,
+    hmac_secret: Secret<String>,
+) -> tide::Server<State> {
+    let state = State::new(db_pool, email_client, base_url, hmac_secret.clone());
     let mut app = tide::with_state(state);
     app.with(After(|mut res: tide::Response| async {
         if let Some(err) = res.downcast_error::<PublishError>() {
@@ -75,15 +81,7 @@ fn get_server(db_pool: PgPool, email_client: EmailClient, base_url: String) -> t
                 res.set_status(StatusCode::Unauthorized);
                 res.append_header(headers::WWW_AUTHENTICATE, r#"Basic realm="publish""#);
             }
-        } else if let Some(err) = res.downcast_error::<LoginError>() {
-            if let LoginError::AuthError(_) = err {
-                let error_msg = err.to_string();
-                res.set_status(StatusCode::SeeOther);
-                res.insert_cookie(http_types::Cookie::new("_flash", error_msg));
-                res.append_header(headers::LOCATION, "/login");
-            }
         }
-
         Ok(res)
     }));
     app.with(TraceMiddleware::new());
