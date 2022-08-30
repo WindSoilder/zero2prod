@@ -1,6 +1,6 @@
 application:
   port: 8000
-  hmac_secret: "super-long"
+  hmac_secret: "super-long-key-that-expected-larger-or-equal-to-thirty-two-bytes"
 database:
   host: "127.0.0.1"
   port: 5432
@@ -12,4 +12,4 @@ email_client:
   sender_email: "public@z2p.online"
   authorization_token: "my-secret-token"
   timeout_milliseconds: 10000
-redis_uri: "redis:127.0.0.1:6379"
+redis_uri: "redis://127.0.0.1:6379"

@@ -41,8 +41,18 @@ pub async fn login(mut req: Request) -> Result {
             }
         },
     };
+    let session = req.session_mut();
+    if let Err(e) = session.insert("user_id", user_id) {
+        let error = LoginError::UnexpectedError(e.into());
+        let error_msg = error.to_string();
+        let mut response = Response::new(StatusCode::SeeOther);
+        attach_cookie(&mut response, &req.state().hmac_secret, error_msg);
+        response.append_header(headers::LOCATION, "/login");
+        return Ok(response);
+    }
+
     tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
-    Ok(Redirect::see_other("/").into())
+    Ok(Redirect::see_other("/admin/dashboard").into())
 }
 
 #[derive(thiserror::Error, Debug)]

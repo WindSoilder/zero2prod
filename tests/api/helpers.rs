@@ -118,6 +118,19 @@ impl TestApp {
             .unwrap()
     }
 
+    pub async fn get_admin_dashboard(&self) -> String {
+        let url = Url::parse(&format!("{}/admin/dashboard", &self.address))
+            .expect("failed to parse url address");
+        let request = surf::get(url).build();
+        self.api_client
+            .send(request)
+            .await
+            .expect("Failed to execute request")
+            .body_string()
+            .await
+            .unwrap()
+    }
+
     pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
         // Parse the body as JSON, starting from raw bytes
         let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();

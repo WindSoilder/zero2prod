@@ -30,7 +30,7 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
         e
     })?;
     let pool = &req.state().connection;
-    let user_id = validate_credentials(credentials, pool)
+    let _user_id = validate_credentials(credentials, pool)
         .await
         .map_err(|e| match e {
             AuthError::InvalidCredentials(_) => PublishError::AuthError(e.into()),

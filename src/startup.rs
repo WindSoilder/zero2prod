@@ -6,13 +6,13 @@ use tide::StatusCode;
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{
-    confirm, health_check, home, login, login_form, publish_newsletter, subscribe, PublishError,
+    admin_dashboard, confirm, health_check, home, login, login_form, publish_newsletter, subscribe,
+    PublishError,
 };
 use crate::State;
 use async_redis_session::RedisSessionStore;
 use secrecy::ExposeSecret;
 use std::net::TcpListener;
-use tide::sessions::{SessionMiddleware, SessionStore};
 use tide::utils::After;
 use tide_tracing::TraceMiddleware;
 
@@ -100,5 +100,6 @@ fn get_server(
     app.at("/newsletters").post(publish_newsletter);
     app.at("/").get(home);
     app.at("/login").get(login_form).post(login);
+    app.at("/admin/dashboard").get(admin_dashboard);
     app
 }
