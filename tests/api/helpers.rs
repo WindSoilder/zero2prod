@@ -156,6 +156,29 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn get_change_password(&self) -> surf::Response {
+        let url = Url::parse(&format!("{}/admin/password", &self.address))
+            .expect("failed to parse url address");
+        let request = surf::get(url).build();
+        self.api_client
+            .send(request)
+            .await
+            .expect("Failed to execute request")
+    }
+
+    pub async fn post_change_password<Body>(&self, body: Body) -> surf::Response
+    where
+        Body: serde::Serialize,
+    {
+        let url = Url::parse(&format!("{}/admin/password", &self.address))
+            .expect("failed to parse url address");
+        let request = surf::post(url).build();
+        self.api_client
+            .send(request)
+            .await
+            .expect("Failed to execute request.")
+    }
 }
 
 // Ensure that the `tracing` stack is only initialised once using `once_cell`

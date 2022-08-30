@@ -21,6 +21,10 @@ pub async fn admin_dashboard(req: Request) -> Result {
 </head>
 <body>
     <p>Welcome {username}!</p>
+    <p> Available actions: </p>
+    <ol>
+        <li><a href="/admin/password">Change password</a></li>
+    </ol>
 </body>
 </html>"#
     );
