@@ -9,7 +9,10 @@ use crate::routes::{
     confirm, health_check, home, login, login_form, publish_newsletter, subscribe, PublishError,
 };
 use crate::State;
+use async_redis_session::RedisSessionStore;
+use secrecy::ExposeSecret;
 use std::net::TcpListener;
+use tide::sessions::{SessionMiddleware, SessionStore};
 use tide::utils::After;
 use tide_tracing::TraceMiddleware;
 
@@ -38,6 +41,7 @@ impl Application {
             email_client,
             configuration.application.base_url.clone(),
             configuration.application.hmac_secret,
+            configuration.redis_uri,
         );
         let listener = TcpListener::bind(format!(
             "{}:{}",
@@ -72,6 +76,7 @@ fn get_server(
     email_client: EmailClient,
     base_url: String,
     hmac_secret: Secret<String>,
+    redis_uri: Secret<String>,
 ) -> tide::Server<State> {
     let state = State::new(db_pool, email_client, base_url, hmac_secret.clone());
     let mut app = tide::with_state(state);
@@ -84,6 +89,10 @@ fn get_server(
         }
         Ok(res)
     }));
+    app.with(tide::sessions::SessionMiddleware::new(
+        RedisSessionStore::new(redis_uri.expose_secret().as_str()).unwrap(),
+        hmac_secret.expose_secret().as_bytes(),
+    ));
     app.with(TraceMiddleware::new());
     app.at("/health_check").get(health_check);
     app.at("/subscriptions").post(subscribe);

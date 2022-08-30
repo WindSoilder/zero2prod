@@ -20,6 +20,7 @@ tracing-bunyan-formatter = "0.3"
 tracing-log = "0.1"
 secrecy = { version = "0.8", features = ["serde"] }
 tide-tracing = "0.0.11"
+# tide-tracing = { path = "/Users/chenhongze/projects/rust_online_code/tide-tracing" }
 serde-aux = "3"
 unicode-segmentation = "1"
 validator = "0.16.0"
@@ -33,6 +34,7 @@ argon2 = { version = "0.4", features = ["std"] }
 hmac = {version = "0.12", features = ["std"]}
 sha2 = "0.10"
 hex = "0.4"
+async-redis-session = "=0.2.1"
 
 # Using table-like toml syntax to avoid a super-long line!
 [dependencies.sqlx]
