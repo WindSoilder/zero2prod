@@ -3,9 +3,9 @@ pub mod configuration;
 pub mod domain;
 pub mod email_client;
 pub mod routes;
+pub mod session_state;
 pub mod startup;
 pub mod telemetry;
-pub mod session_state;
 
 use email_client::EmailClient;
 use secrecy::Secret;

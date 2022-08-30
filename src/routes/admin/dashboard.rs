@@ -2,7 +2,7 @@ use crate::session_state::TypedSession;
 use crate::Request;
 use anyhow::Context;
 use sqlx::PgPool;
-use tide::{Response, Result, Redirect};
+use tide::{Redirect, Response, Result};
 use uuid::Uuid;
 
 pub async fn admin_dashboard(req: Request) -> Result {
