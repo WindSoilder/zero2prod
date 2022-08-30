@@ -118,17 +118,9 @@ impl TestApp {
             .unwrap()
     }
 
-    pub async fn get_admin_dashboard(&self) -> String {
-        let url = Url::parse(&format!("{}/admin/dashboard", &self.address))
-            .expect("failed to parse url address");
-        let request = surf::get(url).build();
-        self.api_client
-            .send(request)
-            .await
-            .expect("Failed to execute request")
-            .body_string()
-            .await
-            .unwrap()
+    pub async fn get_admin_dashboard_html(&self) -> String {
+        let mut resp = self.get_admin_dashboard().await;
+        resp.body_string().await.unwrap()
     }
 
     pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
@@ -153,6 +145,16 @@ impl TestApp {
         let html = get_link(&body["HtmlBody"].as_str().unwrap());
         let plain_text = get_link(&body["TextBody"].as_str().unwrap());
         ConfirmationLinks { html, plain_text }
+    }
+
+    pub async fn get_admin_dashboard(&self) -> surf::Response {
+        let url = Url::parse(&format!("{}/admin/dashboard", &self.address))
+            .expect("failed to parse url address");
+        let request = surf::get(url).build();
+        self.api_client
+            .send(request)
+            .await
+            .expect("Failed to execute request")
     }
 }
 

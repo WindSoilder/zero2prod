@@ -1,16 +1,15 @@
+use crate::session_state::TypedSession;
 use crate::Request;
 use anyhow::Context;
 use sqlx::PgPool;
-use tide::{Response, Result};
+use tide::{Response, Result, Redirect};
 use uuid::Uuid;
 
-pub async fn admin_dashboard(_req: Request) -> Result {
-    let session = _req.session();
-    let pool = &_req.state().connection;
-    let username = match session.get::<Uuid>("user_id") {
-        None => {
-            todo!()
-        }
+pub async fn admin_dashboard(req: Request) -> Result {
+    let session = TypedSession::from_req(&req);
+    let pool = &req.state().connection;
+    let username = match session.get_user_id() {
+        None => return Ok(Redirect::see_other("/login").into()),
         Some(user_id) => get_username(user_id, pool).await?,
     };
     let body = format!(

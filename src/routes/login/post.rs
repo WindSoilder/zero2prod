@@ -1,4 +1,5 @@
 use crate::authentication::{validate_credentials, AuthError, Credentials};
+use crate::session_state::TypedSession;
 use crate::Request;
 use http_types::headers;
 use secrecy::Secret;
@@ -41,8 +42,8 @@ pub async fn login(mut req: Request) -> Result {
             }
         },
     };
-    let session = req.session_mut();
-    if let Err(e) = session.insert("user_id", user_id) {
+    let mut session = TypedSession::from_req(&req);
+    if let Err(e) = session.insert_user_id(user_id) {
         let error = LoginError::UnexpectedError(e.into());
         let error_msg = error.to_string();
         let mut response = Response::new(StatusCode::SeeOther);
