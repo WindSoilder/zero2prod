@@ -50,6 +50,7 @@ pub async fn login(mut req: Request) -> Result {
         response.append_header(headers::LOCATION, "/login");
         return Ok(response);
     }
+    session.regenerate();
 
     tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
     Ok(Redirect::see_other("/admin/dashboard").into())
