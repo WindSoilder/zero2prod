@@ -1,3 +1,4 @@
+use crate::routes::utils::verify_cookie;
 use crate::session_state::TypedSession;
 use crate::Request;
 use tide::{Redirect, Response, Result};
@@ -7,7 +8,16 @@ pub async fn change_password_form(_req: Request) -> Result {
     if session.get_user_id().is_none() {
         return Ok(Redirect::see_other("/login").into());
     }
-    let body = r#"
+    let msg_html = if verify_cookie(&_req) {
+        match _req.cookie("_flash") {
+            Some(cookie) => format!("<p><i>{}</i></p>", cookie.value()),
+            None => "".into(),
+        }
+    } else {
+        "".into()
+    };
+    let body = format!(
+        r#"
     <!DOCTYPE html>
     <html lang="en">
 
@@ -17,6 +27,7 @@ pub async fn change_password_form(_req: Request) -> Result {
     </head>
 
     <body>
+        {msg_html}
         <form action="/admin/password" method="post">
             <label>Current password
                 <input type="password" placeholder="Enter current password" name="current_password">
@@ -34,7 +45,8 @@ pub async fn change_password_form(_req: Request) -> Result {
         <p><a href="/admin/dashboard">&lt;- Back</a></p>
     </body>
 
-    </html>"#;
+    </html>"#
+    );
     let mut resp: Response = body.into();
     resp.set_content_type("text/html; charset=utf-8");
     Ok(resp)

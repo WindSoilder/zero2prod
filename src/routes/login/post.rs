@@ -6,7 +6,7 @@ use secrecy::Secret;
 use serde::Deserialize;
 use tide::{Redirect, Response, Result, StatusCode};
 
-use super::utils::attach_cookie;
+use crate::routes::utils::attach_flashed_message;
 
 #[derive(Deserialize)]
 pub struct FormData {
@@ -33,7 +33,7 @@ pub async fn login(mut req: Request) -> Result {
                 let err = LoginError::AuthError(e.into());
                 let error_msg = err.to_string();
                 let mut response = Response::new(StatusCode::SeeOther);
-                attach_cookie(&mut response, &req.state().hmac_secret, error_msg);
+                attach_flashed_message(&mut response, &req.state().hmac_secret, error_msg);
                 response.append_header(headers::LOCATION, "/login");
                 return Ok(response);
             }
@@ -47,7 +47,7 @@ pub async fn login(mut req: Request) -> Result {
         let error = LoginError::UnexpectedError(e.into());
         let error_msg = error.to_string();
         let mut response = Response::new(StatusCode::SeeOther);
-        attach_cookie(&mut response, &req.state().hmac_secret, error_msg);
+        attach_flashed_message(&mut response, &req.state().hmac_secret, error_msg);
         response.append_header(headers::LOCATION, "/login");
         return Ok(response);
     }

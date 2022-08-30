@@ -167,13 +167,22 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
+    pub async fn get_change_password_html(&self) -> String {
+        self.get_change_password()
+            .await
+            .body_string()
+            .await
+            .unwrap()
+    }
+
     pub async fn post_change_password<Body>(&self, body: Body) -> surf::Response
     where
         Body: serde::Serialize,
     {
         let url = Url::parse(&format!("{}/admin/password", &self.address))
             .expect("failed to parse url address");
-        let request = surf::post(url).build();
+        let mut request = surf::post(url).build();
+        request.body_form(&body).unwrap();
         self.api_client
             .send(request)
             .await

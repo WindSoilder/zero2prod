@@ -1,4 +1,4 @@
-use super::utils::verify_cookie;
+use crate::routes::utils::verify_cookie;
 use crate::Request;
 use http_types::Cookie;
 use tide::{Response, Result};
