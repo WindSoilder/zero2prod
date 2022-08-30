@@ -1,6 +1,5 @@
 use crate::helpers::{assert_is_redirect_to, spawn_app};
 use http_types::headers;
-use surf::StatusCode;
 
 #[async_std::test]
 async fn an_error_flash_message_is_set_on_failure() {
@@ -20,6 +19,7 @@ async fn an_error_flash_message_is_set_on_failure() {
 
     // Act - Part 2 - Follow the redirect
     let html_page = app.get_login_html().await;
+    println!("debug: {}", html_page);
     assert!(html_page.contains(r#"<p><i>Authentication failed</i></p>"#));
     // Act - part 3 - Reload the login page
     let html_page = app.get_login_html().await;

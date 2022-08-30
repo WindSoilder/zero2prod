@@ -1,10 +1,11 @@
 use crate::authentication::{validate_credentials, AuthError, Credentials};
 use crate::Request;
-use hmac::{Hmac, Mac};
 use http_types::headers;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::Secret;
 use serde::Deserialize;
 use tide::{Redirect, Response, Result, StatusCode};
+
+use super::utils::attach_cookie;
 
 #[derive(Deserialize)]
 pub struct FormData {
@@ -31,17 +32,7 @@ pub async fn login(mut req: Request) -> Result {
                 let err = LoginError::AuthError(e.into());
                 let error_msg = err.to_string();
                 let mut response = Response::new(StatusCode::SeeOther);
-                response.insert_cookie(http_types::Cookie::new("_flash", error_msg.clone()));
-                // attach hmac_tag to result.
-                let msg = format!("_flash={error_msg}");
-                let secret = &req.state().hmac_secret.expose_secret().as_bytes();
-                let hmac_tag = {
-                    let mut mac = Hmac::<sha2::Sha256>::new_from_slice(secret).unwrap();
-                    mac.update(msg.as_bytes());
-                    let mac_bytes = mac.finalize().into_bytes();
-                    format!("{mac_bytes:x}")
-                };
-                response.insert_cookie(http_types::Cookie::new("tag", hmac_tag));
+                attach_cookie(&mut response, &req.state().hmac_secret, error_msg);
                 response.append_header(headers::LOCATION, "/login");
                 return Ok(response);
             }
