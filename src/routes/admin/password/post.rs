@@ -1,7 +1,7 @@
 use crate::authentication::{validate_credentials, AuthError, Credentials};
+use crate::login_middleware::UserId;
 use crate::routes::admin::dashboard::get_username;
 use crate::routes::utils::attach_flashed_message;
-use crate::session_state::TypedSession;
 use crate::Request;
 use secrecy::{ExposeSecret, Secret};
 use tide::StatusCode;
@@ -15,11 +15,10 @@ pub struct FormData {
 }
 
 pub async fn change_password(mut req: Request) -> Result {
-    let session = TypedSession::from_req(&req);
-    let user_id = match session.get_user_id() {
-        None => return Ok(Redirect::see_other("/login").into()),
-        Some(user_id) => user_id,
-    };
+    let user_id = req
+        .ext::<UserId>()
+        .expect("request session not initialized, did you enable crate::login_middleware::RequiredLoginMiddleware")
+        .0;
 
     let data: FormData = req.body_form().await.map_err(|mut e| {
         e.set_status(StatusCode::BadRequest);

@@ -1,14 +1,9 @@
 use crate::routes::utils::get_flashed_message;
-use crate::session_state::TypedSession;
 use crate::Request;
 use tide::http::Cookie;
-use tide::{Redirect, Response, Result};
+use tide::{Response, Result};
 
 pub async fn change_password_form(req: Request) -> Result {
-    let session = TypedSession::from_req(&req);
-    if session.get_user_id().is_none() {
-        return Ok(Redirect::see_other("/login").into());
-    }
     let msg_html = get_flashed_message(&req);
     let body = format!(
         r#"

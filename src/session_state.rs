@@ -1,4 +1,3 @@
-use crate::Request;
 use tide::sessions::Session;
 use uuid::Uuid;
 
@@ -7,7 +6,7 @@ pub struct TypedSession(Session);
 impl TypedSession {
     const USER_ID_KEY: &'static str = "user_id";
 
-    pub fn from_req(req: &Request) -> Self {
+    pub fn from_req<S: Clone + Send + Sync + 'static>(req: &tide::Request<S>) -> Self {
         Self(req.session().clone())
     }
     pub fn regenerate(&mut self) {

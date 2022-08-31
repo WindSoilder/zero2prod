@@ -15,6 +15,7 @@ use secrecy::ExposeSecret;
 use std::net::TcpListener;
 use tide::utils::After;
 use tide_tracing::TraceMiddleware;
+use crate::login_middleware::RequiredLoginMiddleware;
 
 // A warpper for tide::Server to hold the newly built server and its port.
 pub struct Application {
@@ -24,7 +25,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn build(configuration: Settings) -> Result<Self, std::io::Error> {
+    pub fn build(configuration: Settings) -> std::result::Result<Self, std::io::Error> {
         let sender_email = configuration
             .email_client
             .sender()
@@ -60,7 +61,7 @@ impl Application {
         self.port
     }
 
-    pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
+    pub async fn run_until_stopped(self) -> std::result::Result<(), std::io::Error> {
         self.server.listen(self.listener).await
     }
 }
@@ -93,6 +94,7 @@ fn get_server(
         RedisSessionStore::new(redis_uri.expose_secret().as_str()).unwrap(),
         hmac_secret.expose_secret().as_bytes(),
     ));
+    app.with(RequiredLoginMiddleware);
     app.with(TraceMiddleware::new());
     app.at("/health_check").get(health_check);
     app.at("/subscriptions").post(subscribe);

@@ -1,17 +1,16 @@
-use crate::session_state::TypedSession;
+use crate::login_middleware::UserId;
 use crate::Request;
 use anyhow::Context;
 use sqlx::PgPool;
-use tide::{Redirect, Response, Result};
+use tide::{Response, Result};
 use uuid::Uuid;
 
 pub async fn admin_dashboard(req: Request) -> Result {
-    let session = TypedSession::from_req(&req);
     let pool = &req.state().connection;
-    let username = match session.get_user_id() {
-        None => return Ok(Redirect::see_other("/login").into()),
-        Some(user_id) => get_username(user_id, pool).await?,
-    };
+    let user_id: &UserId = req
+        .ext::<UserId>()
+        .expect("request session not initialized, did you enable crate::login_middleware::RequiredLoginMiddleware?");
+    let username = get_username(user_id.0, pool).await?;
     let body = format!(
         r#"<!DOCTYPE html>
 <html lang="en">
