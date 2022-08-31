@@ -33,7 +33,7 @@ pub async fn admin_dashboard(req: Request) -> Result {
     Ok(resp)
 }
 
-async fn get_username(user_id: Uuid, pool: &PgPool) -> std::result::Result<String, anyhow::Error> {
+pub async fn get_username(user_id: Uuid, pool: &PgPool) -> std::result::Result<String, anyhow::Error> {
     let row = sqlx::query!(
         r#"
         SELECT username FROM users WHERE user_id = $1

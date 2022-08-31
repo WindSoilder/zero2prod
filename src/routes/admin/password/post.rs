@@ -1,3 +1,5 @@
+use crate::authentication::{validate_credentials, AuthError, Credentials};
+use crate::routes::admin::dashboard::get_username;
 use crate::routes::utils::attach_flashed_message;
 use crate::session_state::TypedSession;
 use crate::Request;
@@ -14,9 +16,10 @@ pub struct FormData {
 
 pub async fn change_password(mut req: Request) -> Result {
     let session = TypedSession::from_req(&req);
-    if session.get_user_id().is_none() {
-        return Ok(Redirect::see_other("/login").into());
-    }
+    let user_id = match session.get_user_id() {
+        None => return Ok(Redirect::see_other("/login").into()),
+        Some(user_id) => user_id,
+    };
 
     let data: FormData = req.body_form().await.map_err(|mut e| {
         e.set_status(StatusCode::BadRequest);
@@ -29,6 +32,27 @@ pub async fn change_password(mut req: Request) -> Result {
             "You entered two different new passwords - the field values must match.".to_string();
         attach_flashed_message(&mut response, hmac_key, error_msg);
         return Ok(response);
+    }
+
+    let pool = &req.state().connection;
+    let username = get_username(user_id, &pool).await?;
+    let credentials = Credentials {
+        username,
+        password: data.current_password,
+    };
+    if let Err(e) = validate_credentials(credentials, &pool).await {
+        return match e {
+            AuthError::InvalidCredentials(_) => {
+                let mut response: Response = Redirect::see_other("/admin/password").into();
+                attach_flashed_message(
+                    &mut response,
+                    hmac_key,
+                    "The current password is incorrect".into(),
+                );
+                Ok(response)
+            }
+            _ => Err(e.into()),
+        };
     }
 
     todo!()
