@@ -21,4 +21,8 @@ impl TypedSession {
     pub fn get_user_id(&self) -> Option<Uuid> {
         self.0.get(Self::USER_ID_KEY)
     }
+
+    pub fn log_out(mut self) {
+        self.0.destroy()
+    }
 }

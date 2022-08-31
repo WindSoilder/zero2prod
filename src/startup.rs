@@ -6,8 +6,8 @@ use tide::StatusCode;
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{
-    admin_dashboard, change_password, change_password_form, confirm, health_check, home, login,
-    login_form, publish_newsletter, subscribe, PublishError,
+    admin_dashboard, change_password, change_password_form, confirm, health_check, home, log_out,
+    login, login_form, publish_newsletter, subscribe, PublishError,
 };
 use crate::State;
 use async_redis_session::RedisSessionStore;
@@ -104,5 +104,6 @@ fn get_server(
     app.at("/admin/password")
         .get(change_password_form)
         .post(change_password);
+    app.at("/admin/logout").post(log_out);
     app
 }

@@ -167,6 +167,16 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
+    pub async fn post_logout(&self) -> surf::Response {
+        let url = Url::parse(&format!("{}/admin/logout", &self.address))
+            .expect("failed to parse url address");
+        let request = surf::post(url).build();
+        self.api_client
+            .send(request)
+            .await
+            .expect("Failed to execute request")
+    }
+
     pub async fn get_change_password_html(&self) -> String {
         self.get_change_password()
             .await

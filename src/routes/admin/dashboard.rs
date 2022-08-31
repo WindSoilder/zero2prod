@@ -24,6 +24,11 @@ pub async fn admin_dashboard(req: Request) -> Result {
     <p> Available actions: </p>
     <ol>
         <li><a href="/admin/password">Change password</a></li>
+        <li>
+            <form name="logoutForm" action="/admin/logout" method="post">
+                <input type="submit" value="Logout">
+            </form>
+        </li>
     </ol>
 </body>
 </html>"#
@@ -33,7 +38,10 @@ pub async fn admin_dashboard(req: Request) -> Result {
     Ok(resp)
 }
 
-pub async fn get_username(user_id: Uuid, pool: &PgPool) -> std::result::Result<String, anyhow::Error> {
+pub async fn get_username(
+    user_id: Uuid,
+    pool: &PgPool,
+) -> std::result::Result<String, anyhow::Error> {
     let row = sqlx::query!(
         r#"
         SELECT username FROM users WHERE user_id = $1
