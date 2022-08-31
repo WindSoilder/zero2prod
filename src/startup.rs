@@ -94,6 +94,8 @@ fn get_server(
         RedisSessionStore::new(redis_uri.expose_secret().as_str()).unwrap(),
         hmac_secret.expose_secret().as_bytes(),
     ));
+    // TODO: RequiredLoginMiddleware only want to handles for specific url
+    // But it seems that it doesn't serve with nested app well, so keep the usage currently for now.
     app.with(RequiredLoginMiddleware);
     app.with(TraceMiddleware::new());
     app.at("/health_check").get(health_check);
