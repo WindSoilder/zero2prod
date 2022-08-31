@@ -1,17 +1,10 @@
-use crate::routes::utils::verify_cookie;
+use crate::routes::utils::get_flashed_message;
 use crate::Request;
 use http_types::Cookie;
 use tide::{Response, Result};
 
 pub async fn login_form(req: Request) -> Result {
-    let error_html = if verify_cookie(&req) {
-        match req.cookie("_flash") {
-            Some(cookie) => format!("<p><i>{}</i></p>", cookie.value()),
-            None => "".into(),
-        }
-    } else {
-        "".into()
-    };
+    let error_html = get_flashed_message(&req);
     let body = format!(
         r#"<!DOCTYPE html>
         <html lang="en">

@@ -1,21 +1,14 @@
-use crate::routes::utils::verify_cookie;
+use crate::routes::utils::get_flashed_message;
 use crate::session_state::TypedSession;
 use crate::Request;
 use tide::{Redirect, Response, Result};
 
-pub async fn change_password_form(_req: Request) -> Result {
-    let session = TypedSession::from_req(&_req);
+pub async fn change_password_form(req: Request) -> Result {
+    let session = TypedSession::from_req(&req);
     if session.get_user_id().is_none() {
         return Ok(Redirect::see_other("/login").into());
     }
-    let msg_html = if verify_cookie(&_req) {
-        match _req.cookie("_flash") {
-            Some(cookie) => format!("<p><i>{}</i></p>", cookie.value()),
-            None => "".into(),
-        }
-    } else {
-        "".into()
-    };
+    let msg_html = get_flashed_message(&req);
     let body = format!(
         r#"
     <!DOCTYPE html>

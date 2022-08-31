@@ -3,12 +3,27 @@ use hmac::{Hmac, Mac};
 use secrecy::{ExposeSecret, Secret};
 use tide::Response;
 
-pub fn attach_flashed_message(response: &mut Response, hmac_key: &Secret<String>, error_msg: String) {
+pub fn attach_flashed_message(
+    response: &mut Response,
+    hmac_key: &Secret<String>,
+    error_msg: String,
+) {
     response.insert_cookie(http_types::Cookie::new("_flash", error_msg.clone()));
     // attach hmac_tag to result.
     let msg = format!("_flash={error_msg}");
     let hmac_tag = gen_hmac_tag(hmac_key, msg);
     response.insert_cookie(http_types::Cookie::new("tag", hmac_tag));
+}
+
+pub fn get_flashed_message(req: &Request) -> String {
+    if verify_cookie(req) {
+        match req.cookie("_flash") {
+            Some(cookie) => format!("<p><i>{}</i></p>", cookie.value()),
+            None => "".into(),
+        }
+    } else {
+        "".into()
+    }
 }
 
 pub fn verify_cookie(req: &Request) -> bool {
