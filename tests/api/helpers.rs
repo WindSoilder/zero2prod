@@ -82,8 +82,6 @@ impl TestApp {
             .expect("failed to parse url address");
         let mut request = surf::post(url).build();
         request.body_json(&body).unwrap();
-        let (username, password) = (&self.test_user.username, &self.test_user.password);
-        attach_basic_auth(&mut request, username, password);
         self.api_client
             .send(request)
             .await
@@ -268,15 +266,6 @@ async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("Failed to migrate the database");
     connection_pool
-}
-
-pub fn attach_basic_auth(req: &mut surf::Request, name: &str, password: &str) {
-    let encode_credentials =
-        base64::encode_config(format!("{}:{}", name, password), base64::STANDARD);
-    req.append_header(
-        http_types::headers::AUTHORIZATION,
-        format!("Basic {encode_credentials}"),
-    )
 }
 
 pub fn assert_is_redirect_to(response: &surf::Response, location: &str) {

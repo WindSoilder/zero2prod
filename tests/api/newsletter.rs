@@ -1,6 +1,7 @@
-use crate::helpers::{attach_basic_auth, spawn_app, ConfirmationLinks, Subscription, TestApp};
+use crate::helpers::{
+    assert_is_redirect_to, spawn_app, ConfirmationLinks, Subscription, TestApp,
+};
 use surf::StatusCode;
-use uuid::Uuid;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
@@ -16,7 +17,12 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
-    // Act
+    // Act - Part 1 - Login
+    let login_body =
+        serde_json::json!({"username": app.test_user.username, "password": app.test_user.password});
+    let _ = app.post_login(&login_body).await;
+
+    // Act - Part 2 - post newsletter
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
         "content": {
@@ -27,6 +33,9 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
     let response = app.post_newsletters(newsletter_request_body).await;
     // Assert
     assert_eq!(response.status(), StatusCode::Ok);
+
+    // Act - Part 3 - clear, logout
+    let _ = app.post_logout().await;
 }
 
 #[async_std::test]
@@ -41,8 +50,12 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
         .expect(1)
         .mount(&app.email_server)
         .await;
+    // Act - Part 1 - Login
+    let login_body =
+        serde_json::json!({"username": app.test_user.username, "password": app.test_user.password});
+    let _ = app.post_login(&login_body).await;
 
-    // Act
+    // Act - Part 2 - post newsletter
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
         "content": {
@@ -54,6 +67,8 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
 
     // Assert
     assert_eq!(response.status(), StatusCode::Ok);
+    // Act - Part 3 - clear, logout
+    let _ = app.post_logout().await;
 }
 
 #[async_std::test]
@@ -70,7 +85,12 @@ async fn newsletters_returns_400_for_invalid_data() {
             "missing content",
         ),
     ];
+    // Act - Part 1 - Login
+    let login_body =
+        serde_json::json!({"username": app.test_user.username, "password": app.test_user.password});
+    let _ = app.post_login(&login_body).await;
 
+    // Act - Part 2 - post newsletter
     for (invalid_body, error_message) in test_cases {
         let response = app.post_newsletters(invalid_body).await;
 
@@ -82,6 +102,8 @@ async fn newsletters_returns_400_for_invalid_data() {
             error_message
         )
     }
+    // Act - Part 3 - clear, logout
+    let _ = app.post_logout().await;
 }
 
 #[async_std::test]
@@ -102,79 +124,7 @@ async fn requests_missing_authorization_are_rejected() {
         .expect("Failed to execute request.");
 
     // Assert
-    assert_eq!(StatusCode::Unauthorized, response.status());
-    assert_eq!(
-        r#"Basic realm="publish""#,
-        response
-            .header("WWW-Authenticate")
-            .unwrap()
-            .get(0)
-            .unwrap()
-            .as_str()
-    );
-}
-
-#[async_std::test]
-async fn non_existing_user_is_rejected() {
-    // Arrange
-    let app = spawn_app().await;
-    // Random credentials.
-    let username = Uuid::new_v4().to_string();
-    let password = Uuid::new_v4().to_string();
-
-    let mut req = surf::post(&format!("{}/admin/newsletters", app.address)).build();
-    attach_basic_auth(&mut req, &username, &password);
-    req.body_json(&serde_json::json!({
-        "title": "Newsletter title",
-        "content": {
-            "text": "Newsletter body as plain text",
-            "html": "<p>Newsletter body as HTML</p>"
-        }
-    }))
-    .unwrap();
-    let resp = surf::client()
-        .send(req)
-        .await
-        .expect("Failed to execute request.");
-
-    // Assert
-    assert_eq!(StatusCode::Unauthorized, resp.status());
-    assert_eq!(
-        r#"Basic realm="publish""#,
-        resp.header("WWW-Authenticate").unwrap().as_str()
-    )
-}
-
-#[async_std::test]
-async fn invalid_password_is_rejected() {
-    // Arrange
-    let app = spawn_app().await;
-    let username = &app.test_user.username;
-    // Random password
-    let password = Uuid::new_v4().to_string();
-    assert_ne!(app.test_user.password, password);
-
-    let mut req = surf::post(&format!("{}/admin/newsletters", app.address)).build();
-    attach_basic_auth(&mut req, &username, &password);
-    req.body_json(&serde_json::json!({
-        "title": "Newsletter title",
-        "content": {
-            "text": "Newsletter body as plain text",
-            "html": "<p>Newsletter body as HTML</p>"
-        }
-    }))
-    .unwrap();
-    let resp = surf::client()
-        .send(req)
-        .await
-        .expect("Failed to execute request.");
-
-    // Assert
-    assert_eq!(StatusCode::Unauthorized, resp.status());
-    assert_eq!(
-        r#"Basic realm="publish""#,
-        resp.header("WWW-Authenticate").unwrap().as_str()
-    )
+    assert_is_redirect_to(&response, "/login");
 }
 
 /// Use the public API of the application under test to create an unconfirmed subscriber.
