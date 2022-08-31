@@ -8,13 +8,8 @@ use tide::StatusCode;
 #[derive(serde::Deserialize)]
 pub struct BodyData {
     title: String,
-    content: Content,
-}
-
-#[derive(serde::Deserialize)]
-pub struct Content {
-    html: String,
-    text: String,
+    html_content: String,
+    text_content: String,
 }
 
 struct ConfirmedSubscriber {
@@ -22,7 +17,7 @@ struct ConfirmedSubscriber {
 }
 
 pub async fn publish_newsletter(mut req: Request) -> Result {
-    let body: BodyData = req.body_json().await.map_err(|mut e| {
+    let body: BodyData = req.body_form().await.map_err(|mut e| {
         e.set_status(StatusCode::BadRequest);
         e
     })?;
@@ -42,8 +37,8 @@ async fn publish_impl(pool: &PgPool, email_client: &EmailClient, body: BodyData)
                     .send_email(
                         &s.email,
                         &body.title,
-                        &body.content.html,
-                        &body.content.text,
+                        &body.html_content,
+                        &body.text_content,
                     )
                     .await
                     .map_err(|e| e.into_inner())

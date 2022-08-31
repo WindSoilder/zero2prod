@@ -81,7 +81,7 @@ impl TestApp {
         let url = Url::parse(&format!("{}/admin/newsletters", self.address))
             .expect("failed to parse url address");
         let mut request = surf::post(url).build();
-        request.body_json(&body).unwrap();
+        request.body_form(&body).unwrap();
         self.api_client
             .send(request)
             .await

@@ -1,6 +1,4 @@
-use crate::helpers::{
-    assert_is_redirect_to, spawn_app, ConfirmationLinks, Subscription, TestApp,
-};
+use crate::helpers::{assert_is_redirect_to, spawn_app, ConfirmationLinks, Subscription, TestApp};
 use surf::StatusCode;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
@@ -25,10 +23,8 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
     // Act - Part 2 - post newsletter
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
-        "content": {
-            "text": "Newsletter body as plain text",
-            "html": "<p>Newsletter body as HTML</p>"
-        }
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>"
     });
     let response = app.post_newsletters(newsletter_request_body).await;
     // Assert
@@ -58,10 +54,8 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
     // Act - Part 2 - post newsletter
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
-        "content": {
-            "text": "Newsletter body as plain text",
-            "html": "<p>Newsletter body as HTML</p>"
-        }
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>"
     });
     let response = app.post_newsletters(newsletter_request_body).await;
 
@@ -77,7 +71,7 @@ async fn newsletters_returns_400_for_invalid_data() {
     let app = spawn_app().await;
     let test_cases = vec![
         (
-            serde_json::json!({"content": {"text": "Newsletter body as plain text", "html": "<p>Newsletter body as HTML</p>"}}),
+            serde_json::json!({"text_content": "Newsletter body as plain text", "html_content": "<p>Newsletter body as HTML</p>"}),
             "missing title",
         ),
         (
@@ -114,10 +108,10 @@ async fn requests_missing_authorization_are_rejected() {
     let response = surf::post(format!("{}/admin/newsletters", &app.address))
         .body_json(&serde_json::json! ({
             "title": "Newsletter title",
-            "content": {
-                "text": "Newsletter body as plain text",
-                "html": "<p>Newsletter body as HTML</p>"
-            }
+
+                "text_content": "Newsletter body as plain text",
+                "html_content": "<p>Newsletter body as HTML</p>"
+
         }))
         .unwrap()
         .await
