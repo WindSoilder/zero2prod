@@ -78,7 +78,7 @@ impl TestApp {
     }
 
     pub async fn post_newsletters(&self, body: serde_json::Value) -> surf::Response {
-        let url = Url::parse(&format!("{}/newsletters", self.address))
+        let url = Url::parse(&format!("{}/admin/newsletters", self.address))
             .expect("failed to parse url address");
         let mut request = surf::post(url).build();
         request.body_json(&body).unwrap();

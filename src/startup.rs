@@ -7,7 +7,7 @@ use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::{
     admin_dashboard, change_password, change_password_form, confirm, health_check, home, log_out,
-    login, login_form, publish_newsletter, subscribe, PublishError,
+    login, login_form, publish_newsletter, subscribe, PublishError, newsletter_form,
 };
 use crate::State;
 use async_redis_session::RedisSessionStore;
@@ -101,9 +101,9 @@ fn get_server(
     app.at("/health_check").get(health_check);
     app.at("/subscriptions").post(subscribe);
     app.at("/subscriptions/confirm").get(confirm);
-    app.at("/newsletters").post(publish_newsletter);
     app.at("/").get(home);
     app.at("/login").get(login_form).post(login);
+    app.at("/admin/newsletters").get(newsletter_form).post(publish_newsletter);
     app.at("/admin/dashboard").get(admin_dashboard);
     app.at("/admin/password")
         .get(change_password_form)

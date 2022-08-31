@@ -89,7 +89,7 @@ async fn requests_missing_authorization_are_rejected() {
     // Arrange
     let app = spawn_app().await;
 
-    let response = surf::post(format!("{}/newsletters", &app.address))
+    let response = surf::post(format!("{}/admin/newsletters", &app.address))
         .body_json(&serde_json::json! ({
             "title": "Newsletter title",
             "content": {
@@ -122,7 +122,7 @@ async fn non_existing_user_is_rejected() {
     let username = Uuid::new_v4().to_string();
     let password = Uuid::new_v4().to_string();
 
-    let mut req = surf::post(&format!("{}/newsletters", app.address)).build();
+    let mut req = surf::post(&format!("{}/admin/newsletters", app.address)).build();
     attach_basic_auth(&mut req, &username, &password);
     req.body_json(&serde_json::json!({
         "title": "Newsletter title",
@@ -154,7 +154,7 @@ async fn invalid_password_is_rejected() {
     let password = Uuid::new_v4().to_string();
     assert_ne!(app.test_user.password, password);
 
-    let mut req = surf::post(&format!("{}/newsletters", app.address)).build();
+    let mut req = surf::post(&format!("{}/admin/newsletters", app.address)).build();
     attach_basic_auth(&mut req, &username, &password);
     req.body_json(&serde_json::json!({
         "title": "Newsletter title",
