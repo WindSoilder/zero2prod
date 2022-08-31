@@ -1,6 +1,7 @@
 use crate::routes::utils::get_flashed_message;
 use crate::session_state::TypedSession;
 use crate::Request;
+use tide::http::Cookie;
 use tide::{Redirect, Response, Result};
 
 pub async fn change_password_form(req: Request) -> Result {
@@ -42,5 +43,7 @@ pub async fn change_password_form(req: Request) -> Result {
     );
     let mut resp: Response = body.into();
     resp.set_content_type("text/html; charset=utf-8");
+    resp.remove_cookie(Cookie::named("_flash"));
+    resp.remove_cookie(Cookie::named("tag"));
     Ok(resp)
 }

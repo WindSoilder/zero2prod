@@ -38,7 +38,7 @@ pub async fn change_password(mut req: Request) -> Result {
     let username = get_username(user_id, &pool).await?;
     let credentials = Credentials {
         username,
-        password: data.current_password,
+        password: data.current_password.clone(),
     };
     if let Err(e) = validate_credentials(credentials, &pool).await {
         return match e {
@@ -55,5 +55,12 @@ pub async fn change_password(mut req: Request) -> Result {
         };
     }
 
-    todo!()
+    crate::authentication::change_password(user_id, data.new_password, &pool).await?;
+    let mut resp: Response = Redirect::see_other("/admin/password").into();
+    attach_flashed_message(
+        &mut resp,
+        hmac_key,
+        "Your password has been changed.".to_string(),
+    );
+    Ok(resp)
 }
