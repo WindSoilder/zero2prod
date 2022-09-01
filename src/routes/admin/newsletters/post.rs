@@ -1,7 +1,7 @@
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
-use crate::idempotency::get_saved_response;
 use crate::idempotency::IdempotencyKey;
+use crate::idempotency::{get_saved_response, save_response};
 use crate::login_middleware::UserId;
 use crate::routes::utils::attach_flashed_message;
 use crate::Request;
@@ -60,6 +60,7 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
         hmac_key,
         "The newsletter issue has been published!".to_string(),
     );
+    let resp = save_response(pool, &idempotency_key, user_id, resp).await?;
     Ok(resp)
 }
 
