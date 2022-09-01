@@ -7,6 +7,7 @@ pub mod routes;
 pub mod session_state;
 pub mod startup;
 pub mod telemetry;
+pub mod idempotency;
 
 use email_client::EmailClient;
 use secrecy::Secret;
