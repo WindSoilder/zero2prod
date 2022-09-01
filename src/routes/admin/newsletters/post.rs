@@ -1,6 +1,8 @@
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
+use crate::idempotency::get_saved_response;
 use crate::idempotency::IdempotencyKey;
+use crate::login_middleware::UserId;
 use crate::routes::utils::attach_flashed_message;
 use crate::Request;
 use anyhow::Context;
@@ -38,7 +40,15 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
             return Ok(resp);
         }
     };
+    // return early if we have a saved response in the database.
+    let user_id = req
+        .ext::<UserId>()
+        .expect("make sure you've load login middleware")
+        .0;
     let pool = &req.state().connection;
+    if let Some(saved_response) = get_saved_response(pool, &idempotency_key, user_id).await? {
+        return Ok(saved_response);
+    }
     let email_client = &req.state().email_client;
 
     publish_impl(pool, email_client, title, html_content, text_content).await?;
