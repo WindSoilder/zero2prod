@@ -183,6 +183,24 @@ impl TestApp {
             .unwrap()
     }
 
+    pub async fn get_publish_newsletter(&self) -> surf::Response {
+        let url = Url::parse(&format!("{}/admin/newsletters", self.address))
+            .expect("failed to parse url address");
+        let request = surf::get(url).build();
+        self.api_client
+            .send(request)
+            .await
+            .expect("Failed to execute requiest")
+    }
+
+    pub async fn get_publish_newsletter_html(&self) -> String {
+        self.get_publish_newsletter()
+            .await
+            .body_string()
+            .await
+            .unwrap()
+    }
+
     pub async fn post_change_password<Body>(&self, body: Body) -> surf::Response
     where
         Body: serde::Serialize,

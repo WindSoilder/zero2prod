@@ -1,10 +1,11 @@
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
+use crate::routes::utils::attach_flashed_message;
 use crate::Request;
 use anyhow::Context;
 use sqlx::PgPool;
-use tide::Result;
 use tide::StatusCode;
+use tide::{Redirect, Result};
 #[derive(serde::Deserialize)]
 pub struct BodyData {
     title: String,
@@ -25,7 +26,14 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
     let email_client = &req.state().email_client;
     publish_impl(pool, email_client, body).await?;
 
-    Ok("".into())
+    let mut resp = Redirect::see_other("/admin/newsletters").into();
+    let hmac_key = &req.state().hmac_secret;
+    attach_flashed_message(
+        &mut resp,
+        hmac_key,
+        "The newsletter issue has been published!".to_string(),
+    );
+    Ok(resp)
 }
 
 async fn publish_impl(pool: &PgPool, email_client: &EmailClient, body: BodyData) -> Result {

@@ -28,7 +28,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
     });
     let response = app.post_newsletters(newsletter_request_body).await;
     // Assert
-    assert_eq!(response.status(), StatusCode::Ok);
+    assert_eq!(response.status(), StatusCode::SeeOther);
 
     // Act - Part 3 - clear, logout
     let _ = app.post_logout().await;
@@ -60,7 +60,7 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
     let response = app.post_newsletters(newsletter_request_body).await;
 
     // Assert
-    assert_eq!(response.status(), StatusCode::Ok);
+    assert_eq!(response.status(), StatusCode::SeeOther);
     // Act - Part 3 - clear, logout
     let _ = app.post_logout().await;
 }
@@ -119,6 +119,37 @@ async fn requests_missing_authorization_are_rejected() {
 
     // Assert
     assert_is_redirect_to(&response, "/login");
+}
+
+#[async_std::test]
+async fn basic_newsletter_published() {
+    // Arrange
+    let app = spawn_app().await;
+    create_confirmed_subscriber(&app).await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+    // Act - Part 1 - Login
+    let login_body =
+        serde_json::json!({"username": app.test_user.username, "password": app.test_user.password});
+    let _ = app.post_login(&login_body).await;
+
+    // Act - Part 2 - post newsletter
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>"
+    });
+    let response = app.post_newsletters(newsletter_request_body).await;
+    assert_is_redirect_to(&response, "/admin/newsletters");
+    let html_page = app.get_publish_newsletter_html().await;
+    assert!(html_page.contains("<p><i>The newsletter issue has been published!</i></p>"));
+
+    let _ = app.post_logout().await;
 }
 
 /// Use the public API of the application under test to create an unconfirmed subscriber.

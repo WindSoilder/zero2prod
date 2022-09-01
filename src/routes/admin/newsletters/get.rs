@@ -1,7 +1,10 @@
+use crate::routes::utils::get_flashed_message;
 use crate::Request;
+use tide::http::Cookie;
 use tide::{Response, Result};
 
-pub async fn newsletter_form(_req: Request) -> Result {
+pub async fn newsletter_form(req: Request) -> Result {
+    let message = get_flashed_message(&req);
     let body = format!(
         r#"<!DOCTYPE html>
         <html lang="en">
@@ -10,6 +13,7 @@ pub async fn newsletter_form(_req: Request) -> Result {
             <title>Publish Newsletter Issue</title>
         </head>
         <body>
+            {message}
             <form action="/admin/newsletters" method="post">
                 <label>Title:<br>
                     <input
@@ -45,5 +49,7 @@ pub async fn newsletter_form(_req: Request) -> Result {
     );
     let mut resp: Response = body.into();
     resp.set_content_type("text/html; charset=utf-8");
+    resp.remove_cookie(Cookie::named("_flash"));
+    resp.remove_cookie(Cookie::named("tag"));
     Ok(resp)
 }
