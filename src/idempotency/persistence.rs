@@ -1,6 +1,6 @@
 use super::IdempotencyKey;
 use sqlx::postgres::PgHasArrayType;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use tide::{Response, StatusCode};
 use uuid::Uuid;
 
@@ -53,7 +53,7 @@ pub async fn get_saved_response(
 }
 
 pub async fn save_response(
-    pool: &PgPool,
+    mut transaction: Transaction<'static, Postgres>,
     idempotency_key: &IdempotencyKey,
     user_id: Uuid,
     mut http_response: Response,
@@ -100,15 +100,15 @@ pub async fn save_response(
         headers,
         body
     )
-    .execute(pool)
+    .execute(&mut transaction)
     .await?;
-
+    transaction.commit().await?;
     http_response.set_body(body);
     Ok(http_response)
 }
 
 pub enum NextAction {
-    StartProcessing,
+    StartProcessing(Transaction<'static, Postgres>),
     ReturnSavedResponse(Response),
 }
 
@@ -117,6 +117,7 @@ pub async fn try_processing(
     idempotency_key: &IdempotencyKey,
     user_id: Uuid,
 ) -> Result<NextAction, anyhow::Error> {
+    let mut transaction = pool.begin().await?;
     let n_inserted_rows = sqlx::query!(
         r#"
         INSERT INTO idempotency (
@@ -130,11 +131,11 @@ pub async fn try_processing(
         user_id,
         idempotency_key.as_ref()
     )
-    .execute(pool)
+    .execute(&mut transaction)
     .await?
     .rows_affected();
     if n_inserted_rows > 0 {
-        Ok(NextAction::StartProcessing)
+        Ok(NextAction::StartProcessing(transaction))
     } else {
         let saved_response = get_saved_response(pool, idempotency_key, user_id)
             .await?

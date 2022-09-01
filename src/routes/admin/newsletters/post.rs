@@ -46,8 +46,8 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
         .expect("make sure you've load login middleware")
         .0;
     let pool = &req.state().connection;
-    match try_processing(&pool, &idempotency_key, user_id).await? {
-        NextAction::StartProcessing => {}
+    let transaction = match try_processing(&pool, &idempotency_key, user_id).await? {
+        NextAction::StartProcessing(t) => t,
         NextAction::ReturnSavedResponse(mut saved_response) => {
             let hmac_key = &req.state().hmac_secret;
             attach_flashed_message(
@@ -57,7 +57,7 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
             );
             return Ok(saved_response);
         }
-    }
+    };
 
     let email_client = &req.state().email_client;
     publish_impl(pool, email_client, title, html_content, text_content).await?;
@@ -68,7 +68,7 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
         hmac_key,
         "The newsletter issue has been published!".to_string(),
     );
-    let resp = save_response(pool, &idempotency_key, user_id, resp).await?;
+    let resp = save_response(transaction, &idempotency_key, user_id, resp).await?;
     Ok(resp)
 }
 
