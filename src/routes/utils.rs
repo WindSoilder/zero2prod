@@ -8,11 +8,15 @@ pub fn attach_flashed_message(
     hmac_key: &Secret<String>,
     error_msg: String,
 ) {
-    response.insert_cookie(http_types::Cookie::new("_flash", error_msg.clone()));
+    let mut flash_cookie = http_types::Cookie::new("_flash", error_msg.clone());
+    flash_cookie.set_path("/");
+    response.insert_cookie(flash_cookie);
     // attach hmac_tag to result.
     let msg = format!("_flash={error_msg}");
     let hmac_tag = gen_hmac_tag(hmac_key, msg);
-    response.insert_cookie(http_types::Cookie::new("tag", hmac_tag));
+    let mut tag_cookie = http_types::Cookie::new("tag", hmac_tag);
+    tag_cookie.set_path("/");
+    response.insert_cookie(tag_cookie);
 }
 
 pub fn get_flashed_message(req: &Request) -> String {

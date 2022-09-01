@@ -12,7 +12,7 @@ async fn an_error_flash_message_is_set_on_failure() {
     let flash_cookie = response.header(headers::SET_COOKIE).unwrap();
     assert!(flash_cookie
         .into_iter()
-        .find(|x| x.as_str() == "_flash=Authentication%20failed")
+        .find(|x| x.as_str().contains("_flash=Authentication%20failed"))
         .is_some());
 
     assert_is_redirect_to(&response, "/login");
