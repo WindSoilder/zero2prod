@@ -2777,9 +2777,9 @@ dependencies = [
 
 [[package]]
 name = "tide-tracing"
-version = "0.0.11"
+version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9737dbee8b322744e5c0fb4d7baf1e1fae332056cbc1f8a356162a6211b853f4"
+checksum = "500f567f8c4d65210e6a7c9978661cc7ad6be1dc97e32c3e88bf8f0f0599c23d"
 dependencies = [
  "async-trait",
  "tide",

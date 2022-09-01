@@ -19,7 +19,7 @@ tracing-subscriber = { version = "0.3", features = ["registry", "env-filter", "f
 tracing-bunyan-formatter = "0.3"
 tracing-log = "0.1"
 secrecy = { version = "0.8", features = ["serde"] }
-tide-tracing = "0.0.11"
+tide-tracing = "0.0.12"
 # tide-tracing = { path = "/Users/chenhongze/projects/rust_online_code/tide-tracing" }
 serde-aux = "3"
 unicode-segmentation = "1"

@@ -1,7 +1,7 @@
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::idempotency::IdempotencyKey;
-use crate::idempotency::{get_saved_response, save_response};
+use crate::idempotency::{get_saved_response, save_response, try_processing, NextAction};
 use crate::login_middleware::UserId;
 use crate::routes::utils::attach_flashed_message;
 use crate::Request;
@@ -46,13 +46,21 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
         .expect("make sure you've load login middleware")
         .0;
     let pool = &req.state().connection;
-    if let Some(saved_response) = get_saved_response(pool, &idempotency_key, user_id).await? {
-        return Ok(saved_response);
+    match try_processing(&pool, &idempotency_key, user_id).await? {
+        NextAction::StartProcessing => {}
+        NextAction::ReturnSavedResponse(mut saved_response) => {
+            let hmac_key = &req.state().hmac_secret;
+            attach_flashed_message(
+                &mut saved_response,
+                hmac_key,
+                "The newsletter issue has been published!".to_string(),
+            );
+            return Ok(saved_response);
+        }
     }
+
     let email_client = &req.state().email_client;
-
     publish_impl(pool, email_client, title, html_content, text_content).await?;
-
     let mut resp = Redirect::see_other("/admin/newsletters").into();
     let hmac_key = &req.state().hmac_secret;
     attach_flashed_message(

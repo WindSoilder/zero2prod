@@ -1,4 +1,6 @@
 use crate::helpers::{assert_is_redirect_to, spawn_app, ConfirmationLinks, Subscription, TestApp};
+use async_std::prelude::FutureExt;
+use std::time::Duration;
 use surf::StatusCode;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
@@ -194,6 +196,42 @@ async fn newsletter_creation_is_idempotent() {
     let html_page = app.get_publish_newsletter_html().await;
     assert!(html_page.contains("<p><i>The newsletter issue has been published!</i></p>"));
 }
+
+#[async_std::test]
+async fn concurrent_form_submission_is_handled_gracefully() {
+    // Arrange
+    let app = spawn_app().await;
+    create_confirmed_subscriber(&app).await;
+    let login_body =
+        serde_json::json!({"username": app.test_user.username, "password": app.test_user.password});
+    let _ = app.post_login(&login_body).await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        // Setting a long delay to ensure that the second request
+        // arrives before the first one completes.
+        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(2)))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    // Act - Submit two newsletter forms concurrently
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::new_v4().to_string()
+    });
+    let response1 = app.post_newsletters(newsletter_request_body.clone());
+    let response2 = app.post_newsletters(newsletter_request_body);
+    let mut all_tasks = response1.join(response2).await;
+    assert_eq!(all_tasks.0.status(), all_tasks.1.status());
+    assert_eq!(
+        all_tasks.0.body_string().await.unwrap(),
+        all_tasks.1.body_string().await.unwrap()
+    );
+}
+
 /// Use the public API of the application under test to create an unconfirmed subscriber.
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
     let body = Subscription {
