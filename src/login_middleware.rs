@@ -9,7 +9,14 @@ pub struct UserId(pub uuid::Uuid);
 impl<S: Clone + Send + Sync + 'static> Middleware<S> for RequiredLoginMiddleware {
     async fn handle(&self, mut req: tide::Request<S>, next: Next<'_, S>) -> Result {
         let req_path = req.url().path();
-        if ["/admin/dashboard", "/admin/password", "/admin/logout", "/admin/newsletters"].contains(&req_path) {
+        if [
+            "/admin/dashboard",
+            "/admin/password",
+            "/admin/logout",
+            "/admin/newsletters",
+        ]
+        .contains(&req_path)
+        {
             let session = TypedSession::from_req(&req);
             let user_id = match session.get_user_id() {
                 None => return Ok(Redirect::see_other("/login").into()),
