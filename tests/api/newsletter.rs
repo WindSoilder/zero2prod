@@ -277,7 +277,3 @@ async fn create_confirmed_subscriber(app: &TestApp) {
         panic!("post subscripitons during create_unconfirmed_subscriber shouldn't failed");
     }
 }
-
-fn when_sending_an_email() -> MockBuilder {
-    Mock::given(path("/email")).and(method("POST"))
-}
