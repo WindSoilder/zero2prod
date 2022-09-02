@@ -6,19 +6,16 @@ use crate::login_middleware::UserId;
 use crate::routes::utils::attach_flashed_message;
 use crate::Request;
 use anyhow::Context;
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use tide::{Redirect, Result};
 use tide::{Response, StatusCode};
+use uuid::Uuid;
 #[derive(serde::Deserialize)]
 pub struct BodyData {
     title: String,
     html_content: String,
     text_content: String,
     idempotency_key: String,
-}
-
-struct ConfirmedSubscriber {
-    email: SubscriberEmail,
 }
 
 pub async fn publish_newsletter(mut req: Request) -> Result {
@@ -46,7 +43,7 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
         .expect("make sure you've load login middleware")
         .0;
     let pool = &req.state().connection;
-    let transaction = match try_processing(&pool, &idempotency_key, user_id).await? {
+    let mut transaction = match try_processing(&pool, &idempotency_key, user_id).await? {
         NextAction::StartProcessing(t) => t,
         NextAction::ReturnSavedResponse(mut saved_response) => {
             let hmac_key = &req.state().hmac_secret;
@@ -58,9 +55,12 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
             return Ok(saved_response);
         }
     };
-
-    let email_client = &req.state().email_client;
-    publish_impl(pool, email_client, title, html_content, text_content).await?;
+    let issue_id = insert_newsletter_issue(&mut transaction, &title, &text_content, &html_content)
+        .await
+        .context("Failed to store newsletter issue deetails")?;
+    enqueue_delivery_tasks(&mut transaction, issue_id)
+        .await
+        .context("Failed to enqueue delivery tasks")?;
     let mut resp = Redirect::see_other("/admin/newsletters").into();
     let hmac_key = &req.state().hmac_secret;
     attach_flashed_message(
@@ -102,33 +102,61 @@ async fn publish_impl(
     Ok("".into())
 }
 
-#[tracing::instrument(name = "Get confirmed subscribers", skip(pool))]
-async fn get_confirmed_subscribers(
-    pool: &PgPool,
-) -> std::result::Result<Vec<std::result::Result<ConfirmedSubscriber, anyhow::Error>>, anyhow::Error>
-{
-    let confirmed_subscribers = sqlx::query!(
-        r#"
-        SELECT email
-        FROM subscriptions
-        WHERE status = 'confirmed'
-        "#
-    )
-    .fetch_all(pool)
-    .await?
-    .into_iter()
-    .map(|r| match SubscriberEmail::parse(r.email) {
-        Ok(email) => Ok(ConfirmedSubscriber { email }),
-        Err(error) => Err(anyhow::anyhow!(error)),
-    })
-    .collect();
-    Ok(confirmed_subscribers)
-}
-
 #[derive(thiserror::Error, Debug)]
 pub enum PublishError {
     #[error("Authentication failed.")]
     AuthError(#[source] anyhow::Error),
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
+}
+
+#[tracing::instrument(skip_all)]
+async fn insert_newsletter_issue(
+    transaction: &mut Transaction<'_, Postgres>,
+    title: &str,
+    text_content: &str,
+    html_content: &str,
+) -> std::result::Result<Uuid, sqlx::Error> {
+    let newsletter_issue_id = Uuid::new_v4();
+    sqlx::query!(
+        r#"
+    INSERT INTO newsletter_issues (
+        newsletter_issue_id,
+        title,
+        text_content,
+        html_content,
+        published_at
+    )
+    VALUES ($1, $2, $3, $4, now())
+    "#,
+        newsletter_issue_id,
+        title,
+        text_content,
+        html_content
+    )
+    .execute(transaction)
+    .await?;
+    Ok(newsletter_issue_id)
+}
+
+#[tracing::instrument(skip_all)]
+async fn enqueue_delivery_tasks(
+    transaction: &mut Transaction<'_, Postgres>,
+    newsletteer_issue_id: Uuid,
+) -> std::result::Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        INSERT INTO issue_delivery_queue(
+            newsletter_issue_id,
+            subscriber_email
+        )
+        SELECT $1, email
+        FROM subscriptions
+        WHERE status = 'confirmed'
+        "#,
+        newsletter_issue_id
+    )
+    .execute(transaction)
+    .await?;
+    Ok(())
 }
