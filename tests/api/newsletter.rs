@@ -6,7 +6,6 @@ use fake::Fake;
 use std::time::Duration;
 use surf::StatusCode;
 use wiremock::matchers::{any, method, path};
-use wiremock::MockBuilder;
 use wiremock::{Mock, ResponseTemplate};
 
 #[async_std::test]
