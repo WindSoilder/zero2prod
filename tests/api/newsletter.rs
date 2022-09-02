@@ -1,8 +1,12 @@
 use crate::helpers::{assert_is_redirect_to, spawn_app, ConfirmationLinks, Subscription, TestApp};
 use async_std::prelude::FutureExt;
+use fake::faker::internet::en::SafeEmail;
+use fake::faker::name::en::Name;
+use fake::Fake;
 use std::time::Duration;
 use surf::StatusCode;
 use wiremock::matchers::{any, method, path};
+use wiremock::MockBuilder;
 use wiremock::{Mock, ResponseTemplate};
 
 #[async_std::test]
@@ -232,11 +236,60 @@ async fn concurrent_form_submission_is_handled_gracefully() {
     );
 }
 
+#[async_std::test]
+async fn transient_errors_do_not_cause_duplicate_deliveries_on_retries() {
+    // Arrange
+    let app = spawn_app().await;
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::new_v4().to_string()
+    });
+    // Two subscribers instead of one!
+    create_confirmed_subscriber(&app).await;
+    create_confirmed_subscriber(&app).await;
+    let login_body =
+        serde_json::json!({"username": app.test_user.username, "password": app.test_user.password});
+    let _ = app.post_login(&login_body).await;
+
+    // Part 1 - Submit newsletter form
+    // Email delivery failes for the second subscriber
+    when_sending_an_email()
+        .respond_with(ResponseTemplate::new(200))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+    when_sending_an_email()
+        .respond_with(ResponseTemplate::new(500))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let response = app.post_newsletters(newsletter_request_body.clone()).await;
+    assert_eq!(response.status(), StatusCode::InternalServerError);
+
+    // Part 2 - Retry submitting the form
+    // Email delivery will succeed for both subscribers now
+    when_sending_an_email()
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .named("Delivery retry")
+        .mount(&app.email_server)
+        .await;
+    let response = app.post_newsletters(newsletter_request_body.clone()).await;
+    assert_eq!(response.status(), StatusCode::SeeOther);
+}
+
 /// Use the public API of the application under test to create an unconfirmed subscriber.
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
+    let name: String = Name().fake();
+    let email: String = SafeEmail().fake();
     let body = Subscription {
-        name: Some("le guin".to_string()),
-        email: Some("ursula_le_guin@gmail.com".to_string()),
+        name: Some(name),
+        email: Some(email),
     };
     let _mock_guard = Mock::given(path("/email"))
         .and(method("POST"))
@@ -266,4 +319,8 @@ async fn create_confirmed_subscriber(app: &TestApp) {
     if resp.status().is_client_error() || resp.status().is_server_error() {
         panic!("post subscripitons during create_unconfirmed_subscriber shouldn't failed");
     }
+}
+
+fn when_sending_an_email() -> MockBuilder {
+    Mock::given(path("/email")).and(method("POST"))
 }

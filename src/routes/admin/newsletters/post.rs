@@ -1,7 +1,7 @@
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::idempotency::IdempotencyKey;
-use crate::idempotency::{get_saved_response, save_response, try_processing, NextAction};
+use crate::idempotency::{save_response, try_processing, NextAction};
 use crate::login_middleware::UserId;
 use crate::routes::utils::attach_flashed_message;
 use crate::Request;
