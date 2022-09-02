@@ -75,11 +75,9 @@ fn get_server(
     let state = State::new(db_pool, email_client, base_url, hmac_secret.clone());
     let mut app = tide::with_state(state);
     app.with(After(|mut res: tide::Response| async {
-        if let Some(err) = res.downcast_error::<PublishError>() {
-            if let PublishError::AuthError(_) = err {
-                res.set_status(StatusCode::Unauthorized);
-                res.append_header(headers::WWW_AUTHENTICATE, r#"Basic realm="publish""#);
-            }
+        if let Some(PublishError::AuthError(_)) = res.downcast_error::<PublishError>() {
+            res.set_status(StatusCode::Unauthorized);
+            res.append_header(headers::WWW_AUTHENTICATE, r#"Basic realm="publish""#);
         }
         Ok(res)
     }));

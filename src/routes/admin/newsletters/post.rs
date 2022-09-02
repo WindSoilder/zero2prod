@@ -41,7 +41,7 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
         .expect("make sure you've load login middleware")
         .0;
     let pool = &req.state().connection;
-    let mut transaction = match try_processing(&pool, &idempotency_key, user_id).await? {
+    let mut transaction = match try_processing(pool, &idempotency_key, user_id).await? {
         NextAction::StartProcessing(t) => t,
         NextAction::ReturnSavedResponse(mut saved_response) => {
             let hmac_key = &req.state().hmac_secret;

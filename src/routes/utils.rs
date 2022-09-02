@@ -38,7 +38,7 @@ pub fn verify_cookie(req: &Request) -> bool {
 
     let hmac_key = &req.state().hmac_secret;
     match req.cookie("tag") {
-        None => return false,
+        None => false,
         Some(tag) => {
             let tag = match hex::decode(tag.value()) {
                 Ok(t) => t,
