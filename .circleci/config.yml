@@ -8,6 +8,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: postgres
+      - image: cimg/redis:7.0.4
     environment:
       # Fail the build if there are warnings
       RUSTFLAGS: '-D warnings'
