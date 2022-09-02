@@ -36,6 +36,7 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscribers() {
     let response = app.post_newsletters(newsletter_request_body).await;
     // Assert
     assert_eq!(response.status(), StatusCode::SeeOther);
+    app.dispatch_all_pending_emails().await;
 
     // Act - Part 3 - clear, logout
     let _ = app.post_logout().await;
@@ -69,6 +70,7 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() {
 
     // Assert
     assert_eq!(response.status(), StatusCode::SeeOther);
+    app.dispatch_all_pending_emails().await;
     // Act - Part 3 - clear, logout
     let _ = app.post_logout().await;
 }
@@ -156,7 +158,7 @@ async fn basic_newsletter_published() {
     assert_is_redirect_to(&response, "/admin/newsletters");
     let html_page = app.get_publish_newsletter_html().await;
     assert!(html_page.contains("<p><i>The newsletter issue has been published!</i></p>"));
-
+    app.dispatch_all_pending_emails().await;
     let _ = app.post_logout().await;
 }
 
@@ -199,6 +201,7 @@ async fn newsletter_creation_is_idempotent() {
     // Act - Part 4 - Follow the redirect.
     let html_page = app.get_publish_newsletter_html().await;
     assert!(html_page.contains("<p><i>The newsletter issue has been published!</i></p>"));
+    app.dispatch_all_pending_emails().await;
 }
 
 #[async_std::test]
@@ -234,53 +237,7 @@ async fn concurrent_form_submission_is_handled_gracefully() {
         all_tasks.0.body_string().await.unwrap(),
         all_tasks.1.body_string().await.unwrap()
     );
-}
-
-#[async_std::test]
-async fn transient_errors_do_not_cause_duplicate_deliveries_on_retries() {
-    // Arrange
-    let app = spawn_app().await;
-    let newsletter_request_body = serde_json::json!({
-        "title": "Newsletter title",
-        "text_content": "Newsletter body as plain text",
-        "html_content": "<p>Newsletter body as HTML</p>",
-        "idempotency_key": uuid::Uuid::new_v4().to_string()
-    });
-    // Two subscribers instead of one!
-    create_confirmed_subscriber(&app).await;
-    create_confirmed_subscriber(&app).await;
-    let login_body =
-        serde_json::json!({"username": app.test_user.username, "password": app.test_user.password});
-    let _ = app.post_login(&login_body).await;
-
-    // Part 1 - Submit newsletter form
-    // Email delivery failes for the second subscriber
-    when_sending_an_email()
-        .respond_with(ResponseTemplate::new(200))
-        .up_to_n_times(1)
-        .expect(1)
-        .mount(&app.email_server)
-        .await;
-    when_sending_an_email()
-        .respond_with(ResponseTemplate::new(500))
-        .up_to_n_times(1)
-        .expect(1)
-        .mount(&app.email_server)
-        .await;
-
-    let response = app.post_newsletters(newsletter_request_body.clone()).await;
-    assert_eq!(response.status(), StatusCode::InternalServerError);
-
-    // Part 2 - Retry submitting the form
-    // Email delivery will succeed for both subscribers now
-    when_sending_an_email()
-        .respond_with(ResponseTemplate::new(200))
-        .expect(1)
-        .named("Delivery retry")
-        .mount(&app.email_server)
-        .await;
-    let response = app.post_newsletters(newsletter_request_body.clone()).await;
-    assert_eq!(response.status(), StatusCode::SeeOther);
+    app.dispatch_all_pending_emails().await;
 }
 
 /// Use the public API of the application under test to create an unconfirmed subscriber.

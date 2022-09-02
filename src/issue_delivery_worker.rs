@@ -1,11 +1,12 @@
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
+use crate::{configuration::Settings, startup::get_connection_pool};
 use sqlx::{PgPool, Postgres, Transaction};
 use std::time::Duration;
 use tracing::{field::display, Span};
 use uuid::Uuid;
 
-enum ExecutionOutcome {
+pub enum ExecutionOutcome {
     TaskCompleted,
     EmptyQueue,
 }
@@ -14,10 +15,10 @@ enum ExecutionOutcome {
     skip_all,
     fields(newsletter_issue_id=tracing::field::Empty,subscriber_email=tracing::field::Empty), err
 )]
-async fn try_execute_task(
+pub async fn try_execute_task(
     pool: &PgPool,
     email_client: &EmailClient,
-) -> Result<(ExecutionOutcome), anyhow::Error> {
+) -> Result<ExecutionOutcome, anyhow::Error> {
     let task = deque_task(pool).await?;
     if task.is_none() {
         return Ok(ExecutionOutcome::EmptyQueue);
@@ -146,4 +147,10 @@ async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyh
             Ok(ExecutionOutcome::TaskCompleted) => {}
         }
     }
+}
+
+pub async fn run_worker_until_stopped(configuration: Settings) -> Result<(), anyhow::Error> {
+    let connection_pool = get_connection_pool(&configuration.database);
+    let email_client = configuration.email_client.client();
+    worker_loop(connection_pool, email_client).await
 }

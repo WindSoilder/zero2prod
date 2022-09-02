@@ -5,9 +5,10 @@ use tide::StatusCode;
 
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
+use crate::login_middleware::RequiredLoginMiddleware;
 use crate::routes::{
     admin_dashboard, change_password, change_password_form, confirm, health_check, home, log_out,
-    login, login_form, publish_newsletter, subscribe, PublishError, newsletter_form,
+    login, login_form, newsletter_form, publish_newsletter, subscribe, PublishError,
 };
 use crate::State;
 use async_redis_session::RedisSessionStore;
@@ -15,7 +16,6 @@ use secrecy::ExposeSecret;
 use std::net::TcpListener;
 use tide::utils::After;
 use tide_tracing::TraceMiddleware;
-use crate::login_middleware::RequiredLoginMiddleware;
 
 // A warpper for tide::Server to hold the newly built server and its port.
 pub struct Application {
@@ -26,17 +26,7 @@ pub struct Application {
 
 impl Application {
     pub fn build(configuration: Settings) -> std::result::Result<Self, std::io::Error> {
-        let sender_email = configuration
-            .email_client
-            .sender()
-            .expect("Invalid sender email address.");
-        let timeout = configuration.email_client.timeout();
-        let email_client = EmailClient::new(
-            configuration.email_client.base_url,
-            sender_email,
-            configuration.email_client.authorization_token,
-            timeout,
-        );
+        let email_client = configuration.email_client.client();
         let server = get_server(
             get_connection_pool(&configuration.database),
             email_client,
@@ -61,12 +51,15 @@ impl Application {
         self.port
     }
 
-    pub async fn run_until_stopped(self) -> std::result::Result<(), std::io::Error> {
-        self.server.listen(self.listener).await
+    pub async fn run_until_stopped(self) -> std::result::Result<(), anyhow::Error> {
+        self.server
+            .listen(self.listener)
+            .await
+            .map_err(|e| e.into())
     }
 }
 
-fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
+pub fn get_connection_pool(configuration: &DatabaseSettings) -> PgPool {
     PgPoolOptions::new()
         .acquire_timeout(std::time::Duration::from_secs(2))
         .connect_lazy_with(configuration.with_db())
@@ -103,7 +96,9 @@ fn get_server(
     app.at("/subscriptions/confirm").get(confirm);
     app.at("/").get(home);
     app.at("/login").get(login_form).post(login);
-    app.at("/admin/newsletters").get(newsletter_form).post(publish_newsletter);
+    app.at("/admin/newsletters")
+        .get(newsletter_form)
+        .post(publish_newsletter);
     app.at("/admin/dashboard").get(admin_dashboard);
     app.at("/admin/password")
         .get(change_password_form)
