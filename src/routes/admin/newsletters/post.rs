@@ -1,12 +1,10 @@
-use crate::domain::SubscriberEmail;
-use crate::email_client::EmailClient;
 use crate::idempotency::IdempotencyKey;
 use crate::idempotency::{save_response, try_processing, NextAction};
 use crate::login_middleware::UserId;
 use crate::routes::utils::attach_flashed_message;
 use crate::Request;
 use anyhow::Context;
-use sqlx::{PgPool, Postgres, Transaction};
+use sqlx::{Postgres, Transaction};
 use tide::{Redirect, Result};
 use tide::{Response, StatusCode};
 use uuid::Uuid;
@@ -72,36 +70,6 @@ pub async fn publish_newsletter(mut req: Request) -> Result {
     Ok(resp)
 }
 
-async fn publish_impl(
-    pool: &PgPool,
-    email_client: &EmailClient,
-    title: String,
-    html_content: String,
-    text_content: String,
-) -> Result {
-    let subscribers = get_confirmed_subscribers(pool).await?;
-    for s in subscribers {
-        match s {
-            Ok(s) => {
-                email_client
-                    .send_email(&s.email, &title, &html_content, &text_content)
-                    .await
-                    .map_err(|e| e.into_inner())
-                    .with_context(|| {
-                        format!("Failed to send newsletter issue to {}", s.email.as_ref())
-                    })?;
-            }
-            Err(error) => {
-                tracing::warn!(
-                    error.cause_chain = ?error,
-                    "Skipping a confirmed subscriber.  Their stored contact details are invalid"
-                )
-            }
-        }
-    }
-    Ok("".into())
-}
-
 #[derive(thiserror::Error, Debug)]
 pub enum PublishError {
     #[error("Authentication failed.")]
@@ -142,7 +110,7 @@ async fn insert_newsletter_issue(
 #[tracing::instrument(skip_all)]
 async fn enqueue_delivery_tasks(
     transaction: &mut Transaction<'_, Postgres>,
-    newsletteer_issue_id: Uuid,
+    newsletter_issue_id: Uuid,
 ) -> std::result::Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
